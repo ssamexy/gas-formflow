@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "1.0",
+  "title": "社區餐會報名",
+  "description": "請協助填寫參加資訊，方便統計餐點與座位。",
+  "notice": "若臨時無法參加，請提前告知主辦人。",
+  "deadlineText": "報名截止：2026/07/10 22:00",
+  "confirmationMessage": "已收到報名，謝謝。",
+  "sheetName": "社區餐會報名回應",
+  "lineMessageTemplate": "【{title}】\n請填寫報名表：\n{publishedUrl}\n\n{deadlineText}\n{notice}",
+  "analysis": {
+    "enabled": true,
+    "primaryKey": "name",
+    "generateCleanData": true,
+    "generateSummary": true,
+    "summaryFields": []
+  },
+  "items": [
+    {
+      "key": "name",
+      "type": "shortText",
+      "title": "姓名",
+      "required": true,
+      "analysis": {
+        "role": "identity"
+      }
+    },
+    {
+      "key": "phone",
+      "type": "shortText",
+      "title": "手機",
+      "required": true
+    },
+    {
+      "key": "area",
+      "type": "dropdown",
+      "title": "所屬區域",
+      "required": true,
+      "options": [
+        "北區",
+        "中區",
+        "南區",
+        "其他"
+      ],
+      "analysis": {
+        "role": "group",
+        "summary": "countOptions"
+      }
+    },
+    {
+      "key": "meal",
+      "type": "multipleChoice",
+      "title": "餐點",
+      "required": true,
+      "options": [
+        "葷食",
+        "素食",
+        "不需餐點"
+      ],
+      "analysis": {
+        "summary": "countOptions"
+      }
+    },
+    {
+      "key": "companions",
+      "type": "scale",
+      "title": "同行人數",
+      "required": true,
+      "lowerBound": 0,
+      "upperBound": 5,
+      "lowerLabel": "0",
+      "upperLabel": "5",
+      "analysis": {
+        "summary": "averageAndDistribution"
+      }
+    },
+    {
+      "key": "note",
+      "type": "paragraph",
+      "title": "備註",
+      "required": false
+    }
+  ]
+}

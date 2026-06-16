@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GAS FormFlow</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8f5;
+      --panel: #ffffff;
+      --ink: #17201b;
+      --muted: #647067;
+      --line: #dce1da;
+      --accent: #176b57;
+      --accent-strong: #0f4f40;
+      --danger: #b42318;
+      --ok: #116b35;
+      --shadow: 0 12px 28px rgba(23, 32, 27, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    header {
+      padding: 20px 16px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    h1 { margin: 0; font-size: clamp(24px, 5vw, 38px); letter-spacing: 0; }
+    .tagline { margin: 4px 0 0; color: var(--muted); }
+    main { padding: 18px 16px 34px; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 420px); gap: 16px; align-items: start; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    button, select {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0 12px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.primary:hover { background: var(--accent-strong); }
+    button:disabled { opacity: .55; cursor: wait; }
+    textarea {
+      width: 100%;
+      min-height: 54vh;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    h2 { margin: 0 0 10px; font-size: 18px; }
+    h3 { margin: 16px 0 8px; font-size: 15px; }
+    .status { margin: 10px 0; padding: 10px; border-radius: 6px; background: #eef4f1; color: var(--accent-strong); }
+    .status.error { background: #fff1f0; color: var(--danger); }
+    .status.ok { background: #edf8f0; color: var(--ok); }
+    .list { display: grid; gap: 8px; }
+    .item { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; }
+    .item small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+    .result a { color: var(--accent-strong); overflow-wrap: anywhere; }
+    .qr {
+      display: grid;
+      place-items: center;
+      width: min(100%, 280px);
+      aspect-ratio: 1;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      margin: 8px 0;
+    }
+    .copybox {
+      width: 100%;
+      min-height: 150px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      background: #fbfcfa;
+    }
+    @media (max-width: 840px) {
+      .grid { grid-template-columns: 1fr; }
+      textarea { min-height: 46vh; }
+      header { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>GAS FormFlow</h1>
+      <p class="tagline" data-i18n="tagline">貼上 AI 產生的 JSON，建立 Google Form、回應 Sheet、公告文案與統計骨架。</p>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="grid">
+      <section class="panel">
+        <div class="toolbar">
+          <select id="exampleSelect" aria-label="載入範例">
+            <option value="">載入範例 JSON</option>
+            <option value="event">活動報名</option>
+            <option value="attendance">出席統計</option>
+            <option value="willingness">志工意願</option>
+            <option value="feedback">滿意度回饋</option>
+          </select>
+          <button id="validateBtn">驗證</button>
+          <button id="previewBtn">預覽</button>
+          <button id="createBtn" class="primary">建立表單</button>
+        </div>
+        <textarea id="jsonInput" spellcheck="false" aria-label="JSON 輸入"></textarea>
+        <div id="status" class="status">請貼上 GAS FormFlow v1 JSON，或先載入範例。</div>
+      </section>
+      <aside class="panel">
+        <h2>預覽與結果</h2>
+        <div id="preview" class="list"></div>
+        <div id="result" class="result"></div>
+      </aside>
+    </div>
+  </main>
+  <script>
+    const examples = {
+      event: {
+        schemaVersion: "1.0",
+        title: "社區餐會報名",
+        description: "請協助填寫參加資訊，方便統計餐點與座位。",
+        notice: "若臨時無法參加，請提前告知主辦人。",
+        deadlineText: "報名截止：2026/07/10 22:00",
+        confirmationMessage: "已收到報名，謝謝。",
+        sheetName: "社區餐會報名回應",
+        lineMessageTemplate: "【{title}】\n請填寫報名表：\n{publishedUrl}\n\n{deadlineText}\n{notice}",
+        analysis: { enabled: true, primaryKey: "name", generateCleanData: true, generateSummary: true, summaryFields: [] },
+        items: [
+          { key: "name", type: "shortText", title: "姓名", required: true, analysis: { role: "identity" } },
+          { key: "phone", type: "shortText", title: "手機", required: true },
+          { key: "area", type: "dropdown", title: "所屬區域", required: true, options: ["北區", "中區", "南區", "其他"], analysis: { role: "group", summary: "countOptions" } },
+          { key: "meal", type: "multipleChoice", title: "餐點", required: true, options: ["葷食", "素食", "不需餐點"], analysis: { summary: "countOptions" } },
+          { key: "companions", type: "scale", title: "同行人數", required: true, lowerBound: 0, upperBound: 5, lowerLabel: "0", upperLabel: "5", analysis: { summary: "averageAndDistribution" } },
+          { key: "note", type: "paragraph", title: "備註", required: false }
+        ]
+      },
+      attendance: {
+        schemaVersion: "1.0",
+        title: "小組出席統計",
+        description: "每週聚會出席與代禱事項整理。",
+        deadlineText: "請於聚會前一天完成填寫。",
+        lineMessageTemplate: "【{title}】\n本週出席回覆：{publishedUrl}\n{deadlineText}",
+        analysis: { enabled: true, primaryKey: "name", generateCleanData: true, generateSummary: true, summaryFields: [] },
+        items: [
+          { key: "name", type: "shortText", title: "姓名", required: true },
+          { key: "attendance", type: "multipleChoice", title: "本週是否出席", required: true, options: ["會出席", "請假", "尚不確定"], analysis: { summary: "countOptions" } },
+          { key: "reason", type: "paragraph", title: "請假或不確定原因", required: false },
+          { key: "prayer", type: "paragraph", title: "代禱事項", required: false }
+        ]
+      },
+      willingness: {
+        schemaVersion: "1.0",
+        title: "志工支援意願調查",
+        description: "請選擇可支援的時段與服事項目。",
+        notice: "實際分配會由同工再確認。",
+        lineMessageTemplate: "【{title}】\n請填寫支援意願：{publishedUrl}\n{notice}",
+        analysis: { enabled: true, primaryKey: "name", generateCleanData: true, generateSummary: true, summaryFields: [] },
+        items: [
+          { key: "name", type: "shortText", title: "姓名", required: true },
+          { key: "teams", type: "checkbox", title: "可支援項目", required: true, options: ["接待", "場佈", "餐點", "兒童", "攝影"], analysis: { summary: "countCheckboxOptions" } },
+          { key: "availability", type: "checkboxGrid", title: "可支援時段", required: false, rows: ["週六上午", "週六下午", "週日上午"], columns: ["可以", "需要再確認"] },
+          { key: "experience", type: "paragraph", title: "相關經驗或限制", required: false }
+        ]
+      },
+      feedback: {
+        schemaVersion: "1.0",
+        title: "課程滿意度回饋",
+        description: "協助我們改善下次課程。",
+        lineMessageTemplate: "【{title}】\n課程回饋表：{publishedUrl}",
+        analysis: { enabled: true, generateCleanData: true, generateSummary: true, summaryFields: [] },
+        items: [
+          { key: "overall_score", type: "scale", title: "整體滿意度", required: true, lowerBound: 1, upperBound: 5, lowerLabel: "很不滿意", upperLabel: "很滿意", analysis: { summary: "averageAndDistribution" } },
+          { key: "pace", type: "multipleChoice", title: "課程步調", required: true, options: ["太快", "剛好", "太慢"], analysis: { summary: "countOptions" } },
+          { key: "favorite", type: "paragraph", title: "最有幫助的內容", required: false },
+          { key: "suggestion", type: "paragraph", title: "建議", required: false }
+        ]
+      }
+    };
+
+    const input = document.getElementById('jsonInput');
+    const statusEl = document.getElementById('status');
+    const previewEl = document.getElementById('preview');
+    const resultEl = document.getElementById('result');
+    const buttons = [...document.querySelectorAll('button, select')];
+
+    document.getElementById('exampleSelect').addEventListener('change', (event) => {
+      const spec = examples[event.target.value];
+      if (!spec) return;
+      input.value = JSON.stringify(spec, null, 2);
+      setStatus('範例已載入，可以先按「預覽」。', 'ok');
+      resultEl.innerHTML = '';
+      previewEl.innerHTML = '';
+    });
+    document.getElementById('validateBtn').addEventListener('click', validateSpec);
+    document.getElementById('previewBtn').addEventListener('click', previewSpec);
+    document.getElementById('createBtn').addEventListener('click', createFlow);
+    input.value = JSON.stringify(examples.event, null, 2);
+
+    function validateSpec() {
+      run('apiValidateSpec', [input.value], (res) => {
+        if (res.ok) setStatus('JSON 驗證通過。', 'ok');
+        else setStatus(res.errors.join('\n'), 'error');
+      });
+    }
+
+    function previewSpec() {
+      run('apiPreviewSpec', [input.value], (res) => {
+        if (!res.ok) {
+          setStatus(res.errors.join('\n'), 'error');
+          return;
+        }
+        setStatus('預覽已更新。', 'ok');
+        renderPreview(res);
+      });
+    }
+
+    function createFlow() {
+      if (!confirm('確定要在你的 Google 帳號建立 Google Form 與 Google Sheet？')) return;
+      setStatus('正在建立，請不要關閉視窗...', '');
+      run('apiCreateFormFlow', [input.value], (res) => {
+        if (!res.ok) {
+          setStatus((res.errors || ['建立失敗']).join('\n'), 'error');
+          return;
+        }
+        setStatus('建立完成。', 'ok');
+        renderResult(res);
+      });
+    }
+
+    function run(fn, args, onSuccess) {
+      setBusy(true);
+      google.script.run
+        .withSuccessHandler((res) => { setBusy(false); onSuccess(res); })
+        .withFailureHandler((error) => {
+          setBusy(false);
+          setStatus('操作失敗：' + (error && error.message ? error.message : error), 'error');
+        })[fn](...args);
+    }
+
+    function renderPreview(data) {
+      const form = data.form;
+      const sheet = data.sheet;
+      previewEl.innerHTML = `
+        <div class="item"><strong>${escapeHtml(form.title)}</strong><small>${escapeHtml(form.description || '')}</small><small>題目數量：${form.itemCount}</small></div>
+        <h3>題目</h3>
+        ${form.items.map((item) => `<div class="item"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.key)} · ${escapeHtml(item.type)} · ${item.required ? '必填' : '非必填'}</small><small>${escapeHtml([...(item.options || []), ...(item.rows || []), ...(item.columns || [])].join(' / '))}</small></div>`).join('')}
+        <h3>Sheet 結構</h3>
+        <div class="item"><strong>分頁</strong><small>${sheet.sheets.map(escapeHtml).join(' / ')}</small></div>
+        <div class="item"><strong>Clean_Data 欄位</strong><small>${sheet.cleanDataColumns.map(escapeHtml).join(' | ')}</small></div>
+        <div class="item"><strong>可統計欄位</strong><small>${sheet.statFields.map(escapeHtml).join(' / ') || '無'}</small></div>
+        <div class="item"><strong>不適合自動統計</strong><small>${sheet.nonStatFields.map(escapeHtml).join(' / ') || '無'}</small></div>
+        <div class="item"><strong>統計摘要規劃</strong><small>${sheet.summaryPlan.map(escapeHtml).join(' / ')}</small></div>
+      `;
+    }
+
+    function renderResult(res) {
+      const qrSvg = renderQrPlaceholder(res.publishedUrl);
+      resultEl.innerHTML = `
+        <h3>建立結果</h3>
+        <div class="item"><strong>填寫連結</strong><small><a href="${escapeAttr(res.publishedUrl)}" target="_blank">${escapeHtml(res.publishedUrl)}</a></small></div>
+        <div class="item"><strong>編輯連結</strong><small><a href="${escapeAttr(res.editUrl)}" target="_blank">${escapeHtml(res.editUrl)}</a></small></div>
+        <div class="item"><strong>Sheet</strong><small><a href="${escapeAttr(res.sheetUrl)}" target="_blank">${escapeHtml(res.sheetUrl)}</a></small></div>
+        <div class="item"><strong>建立時間</strong><small>${escapeHtml(res.createdAt)}</small></div>
+        <h3>QR code</h3>
+        <div class="qr">${qrSvg}</div>
+        <button onclick="downloadQr()">下載 QR placeholder</button>
+        <h3>公告文案</h3>
+        <div id="announcement" class="copybox">${escapeHtml(res.announcement)}</div>
+        <button onclick="copyAnnouncement()">複製公告</button>
+      `;
+    }
+
+    function renderQrPlaceholder(text) {
+      const safe = escapeHtml(text);
+      let cells = '';
+      for (let y = 0; y < 21; y++) {
+        for (let x = 0; x < 21; x++) {
+          const finder = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
+          const hash = (x * 31 + y * 17 + text.length * 13 + text.charCodeAt((x + y) % text.length)) % 5;
+          if (finder || hash === 0 || hash === 3) cells += `<rect x="${x}" y="${y}" width="1" height="1"/>`;
+        }
+      }
+      window.__lastQrSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21"><rect width="21" height="21" fill="white"/><g fill="#17201b">${cells}</g></svg>`;
+      return `<div>${window.__lastQrSvg}<small>v1 placeholder<br>${safe}</small></div>`;
+    }
+
+    function downloadQr() {
+      const blob = new Blob([window.__lastQrSvg || ''], { type: 'image/svg+xml' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'gas-formflow-qr-placeholder.svg';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function copyAnnouncement() {
+      const text = document.getElementById('announcement')?.innerText || '';
+      navigator.clipboard.writeText(text).then(() => setStatus('公告文案已複製。', 'ok'));
+    }
+
+    function setStatus(message, type) {
+      statusEl.textContent = message;
+      statusEl.className = 'status' + (type ? ' ' + type : '');
+    }
+
+    function setBusy(busy) {
+      buttons.forEach((button) => button.disabled = busy);
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replace(/`/g, '&#96;');
+    }
+  </script>
+</body>
+</html>

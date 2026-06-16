@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0",
+  "title": "課程滿意度回饋",
+  "description": "協助我們改善下次課程。",
+  "lineMessageTemplate": "【{title}】\n課程回饋表：{publishedUrl}",
+  "analysis": {
+    "enabled": true,
+    "generateCleanData": true,
+    "generateSummary": true,
+    "summaryFields": []
+  },
+  "items": [
+    {
+      "key": "overall_score",
+      "type": "scale",
+      "title": "整體滿意度",
+      "required": true,
+      "lowerBound": 1,
+      "upperBound": 5,
+      "lowerLabel": "很不滿意",
+      "upperLabel": "很滿意",
+      "analysis": {
+        "summary": "averageAndDistribution"
+      }
+    },
+    {
+      "key": "pace",
+      "type": "multipleChoice",
+      "title": "課程步調",
+      "required": true,
+      "options": [
+        "太快",
+        "剛好",
+        "太慢"
+      ],
+      "analysis": {
+        "summary": "countOptions"
+      }
+    },
+    {
+      "key": "favorite",
+      "type": "paragraph",
+      "title": "最有幫助的內容",
+      "required": false
+    },
+    {
+      "key": "suggestion",
+      "type": "paragraph",
+      "title": "建議",
+      "required": false
+    }
+  ]
+}

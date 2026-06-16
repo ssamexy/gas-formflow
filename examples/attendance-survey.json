@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0",
+  "title": "小組出席統計",
+  "description": "每週聚會出席與代禱事項整理。",
+  "deadlineText": "請於聚會前一天完成填寫。",
+  "lineMessageTemplate": "【{title}】\n本週出席回覆：{publishedUrl}\n{deadlineText}",
+  "analysis": {
+    "enabled": true,
+    "primaryKey": "name",
+    "generateCleanData": true,
+    "generateSummary": true,
+    "summaryFields": []
+  },
+  "items": [
+    {
+      "key": "name",
+      "type": "shortText",
+      "title": "姓名",
+      "required": true
+    },
+    {
+      "key": "attendance",
+      "type": "multipleChoice",
+      "title": "本週是否出席",
+      "required": true,
+      "options": [
+        "會出席",
+        "請假",
+        "尚不確定"
+      ],
+      "analysis": {
+        "summary": "countOptions"
+      }
+    },
+    {
+      "key": "reason",
+      "type": "paragraph",
+      "title": "請假或不確定原因",
+      "required": false
+    },
+    {
+      "key": "prayer",
+      "type": "paragraph",
+      "title": "代禱事項",
+      "required": false
+    }
+  ]
+}

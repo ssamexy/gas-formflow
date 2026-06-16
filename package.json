@@ -1,0 +1,19 @@
+{
+  "name": "gas-formflow",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Self-hosted Google Apps Script form workflow generator.",
+  "scripts": {
+    "build": "node tools/build-dist.js",
+    "validate": "node tools/validate-project.js",
+    "check": "npm run build && npm run validate"
+  },
+  "keywords": [
+    "google-apps-script",
+    "google-forms",
+    "google-sheets",
+    "workflow"
+  ],
+  "author": "ssamexy <ssamexy@gmail.com>",
+  "license": "MIT"
+}

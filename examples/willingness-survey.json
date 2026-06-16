@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0",
+  "title": "志工支援意願調查",
+  "description": "請選擇可支援的時段與服事項目。",
+  "notice": "實際分配會由同工再確認。",
+  "lineMessageTemplate": "【{title}】\n請填寫支援意願：{publishedUrl}\n{notice}",
+  "analysis": {
+    "enabled": true,
+    "primaryKey": "name",
+    "generateCleanData": true,
+    "generateSummary": true,
+    "summaryFields": []
+  },
+  "items": [
+    {
+      "key": "name",
+      "type": "shortText",
+      "title": "姓名",
+      "required": true
+    },
+    {
+      "key": "teams",
+      "type": "checkbox",
+      "title": "可支援項目",
+      "required": true,
+      "options": [
+        "接待",
+        "場佈",
+        "餐點",
+        "兒童",
+        "攝影"
+      ],
+      "analysis": {
+        "summary": "countCheckboxOptions"
+      }
+    },
+    {
+      "key": "availability",
+      "type": "checkboxGrid",
+      "title": "可支援時段",
+      "required": false,
+      "rows": [
+        "週六上午",
+        "週六下午",
+        "週日上午"
+      ],
+      "columns": [
+        "可以",
+        "需要再確認"
+      ]
+    },
+    {
+      "key": "experience",
+      "type": "paragraph",
+      "title": "相關經驗或限制",
+      "required": false
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+.clasprc.json
+.env
+node_modules/
+dist/*.tmp
+.DS_Store
+Thumbs.db
