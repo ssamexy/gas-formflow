@@ -1,0 +1,74 @@
+# Agent Validation Guide
+
+This project is designed so an AI agent can validate most behavior without opening the Apps Script editor.
+
+## Public Test Modes
+
+When deployed as a Web App, these URLs are safe for automated checks:
+
+```text
+WEB_APP_URL?mode=health
+WEB_APP_URL?mode=agent-test
+```
+
+`mode=health` returns a small JSON payload.
+
+`mode=agent-test` runs no-side-effect checks inside Apps Script:
+
+- Valid GAS FormFlow v1 JSON passes schema validation.
+- Preview returns form and Sheet structure.
+- Unsupported item types are rejected with user-readable errors.
+- The response declares `sideEffects: "none"`.
+
+This endpoint does not create Google Forms or Google Sheets.
+
+## Access Limitation
+
+Apps Script Web App access is controlled by Google's deployment layer before project code runs. If an automated HTTP client receives a Google sign-in page or HTTP 403, the request did not reach `doGet`; the Google account, Workspace policy, or deployment setting is blocking anonymous access.
+
+In that case, the agent has three options:
+
+- Use a browser session that is signed in to an allowed Google account.
+- Ask the deployer to change the Web App access in Apps Script UI to the broadest allowed option.
+- Limit unattended validation to local `npm run check` and signed-in/manual Web App smoke tests.
+
+The repository still exposes `mode=agent-test`; the blocker is deployment access, not application logic.
+
+## Full Creation Test
+
+Full creation can only be validated after the deploying Google account has authorized the required Apps Script scopes. It creates real Google Form and Sheet files under the deployer account, so it should be treated as a state-changing smoke test.
+
+Recommended human-approved flow:
+
+1. Open the Web App URL as the deploying account.
+2. Load an example JSON.
+3. Click Validate.
+4. Click Preview.
+5. Click Create form.
+6. Confirm that the result shows:
+   - published form URL
+   - edit form URL
+   - Sheet URL
+   - announcement text
+   - QR placeholder
+7. Open the Sheet and confirm these tabs exist:
+   - `Form Responses 1`
+   - `Clean_Data`
+   - `Question_Meta`
+   - `Summary`
+   - `Announcement`
+   - `Generator_Log`
+
+## Playwright Notes
+
+GAS Web Apps render inside nested Google iframes. Agents using Playwright should find the app frame by looking for a frame whose parent URL contains `userCodeAppPanel` and whose own URL is `/blank` or `about:blank`.
+
+The frontend exposes `window.__e2e` in the app frame with read-only helpers for automated validation:
+
+- `getExampleKeys()`
+- `getCurrentJson()`
+- `getStatusText()`
+- `hasPreview()`
+- `loadExample(key)`
+
+Use `data-testid` attributes for stable selectors.

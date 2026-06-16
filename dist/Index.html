@@ -118,24 +118,24 @@
     <div class="grid">
       <section class="panel">
         <div class="toolbar">
-          <select id="exampleSelect" aria-label="載入範例">
+          <select id="exampleSelect" data-testid="example-select" aria-label="載入範例">
             <option value="">載入範例 JSON</option>
             <option value="event">活動報名</option>
             <option value="attendance">出席統計</option>
             <option value="willingness">志工意願</option>
             <option value="feedback">滿意度回饋</option>
           </select>
-          <button id="validateBtn">驗證</button>
-          <button id="previewBtn">預覽</button>
-          <button id="createBtn" class="primary">建立表單</button>
+          <button id="validateBtn" data-testid="validate-button">驗證</button>
+          <button id="previewBtn" data-testid="preview-button">預覽</button>
+          <button id="createBtn" data-testid="create-button" class="primary">建立表單</button>
         </div>
-        <textarea id="jsonInput" spellcheck="false" aria-label="JSON 輸入"></textarea>
-        <div id="status" class="status">請貼上 GAS FormFlow v1 JSON，或先載入範例。</div>
+        <textarea id="jsonInput" data-testid="json-input" spellcheck="false" aria-label="JSON 輸入"></textarea>
+        <div id="status" data-testid="status" class="status">請貼上 GAS FormFlow v1 JSON，或先載入範例。</div>
       </section>
       <aside class="panel">
         <h2>預覽與結果</h2>
-        <div id="preview" class="list"></div>
-        <div id="result" class="result"></div>
+        <div id="preview" data-testid="preview" class="list"></div>
+        <div id="result" data-testid="result" class="result"></div>
       </aside>
     </div>
   </main>
@@ -221,6 +221,17 @@
     document.getElementById('previewBtn').addEventListener('click', previewSpec);
     document.getElementById('createBtn').addEventListener('click', createFlow);
     input.value = JSON.stringify(examples.event, null, 2);
+    window.__e2e = {
+      getExampleKeys: () => Object.keys(examples),
+      getCurrentJson: () => input.value,
+      getStatusText: () => statusEl.textContent,
+      hasPreview: () => previewEl.children.length > 0,
+      loadExample: (key) => {
+        if (!examples[key]) return false;
+        input.value = JSON.stringify(examples[key], null, 2);
+        return true;
+      }
+    };
 
     function validateSpec() {
       run('apiValidateSpec', [input.value], (res) => {

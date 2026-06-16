@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node tools/build-dist.js",
     "validate": "node tools/validate-project.js",
-    "check": "npm run build && npm run validate"
+    "check": "npm run build && npm run validate",
+    "smoke:agent": "node tools/agent-smoke.js"
   },
   "keywords": [
     "google-apps-script",

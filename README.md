@@ -120,6 +120,25 @@ tools/     本地打包與驗證腳本
 
 v1 目前提供 QR provider 架構與可下載 SVG placeholder，不依賴外部 QR API，也不使用已淘汰的 Google Image Charts API。完整離線 QR 編碼器列為 v1.1 工作項。
 
+## AI Agent 驗證
+
+部署成 Web App 後，AI agent 可以用無副作用 endpoint 驗證部署狀態：
+
+```text
+WEB_APP_URL?mode=health
+WEB_APP_URL?mode=agent-test
+```
+
+也可以在本機執行：
+
+```bash
+TEST_WEB_APP_URL="https://script.google.com/macros/s/DEPLOYMENT_ID/exec" npm run smoke:agent
+```
+
+詳細驗證矩陣見 [Agent Validation Guide](docs/agent-validation.md)。
+
+如果 HTTP smoke test 回 Google 登入頁或 403，代表 Google 的 Apps Script deployment access 在程式碼執行前就擋住匿名請求。這時需要用已登入且有權限的瀏覽器 session 測，或到 Apps Script UI 調整 Web App 存取權。
+
 ## v1 不支援
 
 - 檔案上傳題
