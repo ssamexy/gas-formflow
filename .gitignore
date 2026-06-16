@@ -1,4 +1,5 @@
 .clasprc.json
+.clasp.json
 .env
 node_modules/
 dist/*.tmp

@@ -87,6 +87,15 @@ clasp clone <scriptId>
 clasp push
 ```
 
+建議讓 `.clasp.json` 使用 `dist` 作為 root：
+
+```json
+{
+  "scriptId": "YOUR_SCRIPT_ID",
+  "rootDir": "dist"
+}
+```
+
 ## Repo 結構
 
 ```text

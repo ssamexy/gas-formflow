@@ -14,6 +14,7 @@ const required = [
   'src/Index.html',
   'dist/Code.gs',
   'dist/Index.html',
+  'dist/appsscript.json',
   'docs/schema-v1.md',
   'docs/chatgpt-prompt.md',
   'docs/install.zh-TW.md',
