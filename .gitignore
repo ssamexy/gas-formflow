@@ -1,5 +1,7 @@
 .clasprc.json
 .clasp.json
+.agent-smoke-token
+.edge-test-profile/
 .env
 node_modules/
 dist/*.tmp

@@ -22,6 +22,14 @@ WEB_APP_URL?mode=agent-test
 
 This endpoint does not create Google Forms or Google Sheets.
 
+For full state-changing verification:
+
+```text
+WEB_APP_URL?mode=create-smoke&confirm=CREATE_TEST_RESOURCES&token=AGENT_SMOKE_TOKEN
+```
+
+This creates one real Google Form and one real Google Sheet in the deploying account, then returns the published form URL, edit URL, Sheet URL, announcement text, timestamp, and expected Sheet tabs. `AGENT_SMOKE_TOKEN` must be stored in Apps Script Properties first.
+
 ## Access Limitation
 
 Apps Script Web App access is controlled by Google's deployment layer before project code runs. If an automated HTTP client receives a Google sign-in page or HTTP 403, the request did not reach `doGet`; the Google account, Workspace policy, or deployment setting is blocking anonymous access.
@@ -36,7 +44,7 @@ The repository still exposes `mode=agent-test`; the blocker is deployment access
 
 ## Full Creation Test
 
-Full creation can only be validated after the deploying Google account has authorized the required Apps Script scopes. It creates real Google Form and Sheet files under the deployer account, so it should be treated as a state-changing smoke test.
+Full creation can only be validated after the deploying Google account has authorized the required Apps Script scopes. It creates real Google Form and Sheet files under the deployer account, so it should be treated as a state-changing smoke test. Prefer the token-protected `create-smoke` endpoint above for repeatable AI-agent verification.
 
 Recommended human-approved flow:
 
