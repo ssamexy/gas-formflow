@@ -14,7 +14,7 @@
     "access": "MYSELF"
   },
   "webapp": {
-    "executeAs": "USER_ACCESSING",
-    "access": "ANYONE"
+    "executeAs": "USER_DEPLOYING",
+    "access": "MYSELF"
   }
 }
