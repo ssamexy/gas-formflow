@@ -147,6 +147,12 @@ WEB_APP_URL?mode=create-smoke&confirm=CREATE_TEST_RESOURCES&token=AGENT_SMOKE_TO
 
 `AGENT_SMOKE_TOKEN` 必須先存入 Apps Script Properties。
 
+建立後可用下列 endpoint 讀回 Sheet 結構：
+
+```text
+WEB_APP_URL?mode=verify-smoke&sheetId=SPREADSHEET_ID&token=AGENT_SMOKE_TOKEN
+```
+
 ## v1 不支援
 
 - 檔案上傳題

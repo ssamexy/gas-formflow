@@ -30,8 +30,8 @@ var SheetBuilder = (function () {
 
   function ensureSheets(spreadsheet) {
     var first = spreadsheet.getSheets()[0];
-    first.setName('Form Responses 1');
-    SHEETS.slice(1).forEach(function (name) {
+    first.setName('Clean_Data');
+    SHEETS.filter(function (name) { return name !== 'Form Responses 1' && name !== 'Clean_Data'; }).forEach(function (name) {
       var existing = spreadsheet.getSheetByName(name);
       if (!existing) spreadsheet.insertSheet(name);
     });

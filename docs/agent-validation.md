@@ -30,6 +30,14 @@ WEB_APP_URL?mode=create-smoke&confirm=CREATE_TEST_RESOURCES&token=AGENT_SMOKE_TO
 
 This creates one real Google Form and one real Google Sheet in the deploying account, then returns the published form URL, edit URL, Sheet URL, announcement text, timestamp, and expected Sheet tabs. `AGENT_SMOKE_TOKEN` must be stored in Apps Script Properties first.
 
+After creation, verify the generated spreadsheet:
+
+```text
+WEB_APP_URL?mode=verify-smoke&sheetId=SPREADSHEET_ID&token=AGENT_SMOKE_TOKEN
+```
+
+This reads back Sheet tabs, `Clean_Data` headers, `Question_Meta` headers, a `Summary` preview, `Announcement` text, and `Generator_Log` row count.
+
 ## Access Limitation
 
 Apps Script Web App access is controlled by Google's deployment layer before project code runs. If an automated HTTP client receives a Google sign-in page or HTTP 403, the request did not reach `doGet`; the Google account, Workspace policy, or deployment setting is blocking anonymous access.

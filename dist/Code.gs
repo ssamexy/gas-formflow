@@ -29,6 +29,17 @@ function doGet(e) {
       .createTextOutput(JSON.stringify(apiCreateSmokeTest(), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
   }
+  if (e && e.parameter && e.parameter.mode === 'verify-smoke') {
+    var verifyTokenCheck = validateAgentSmokeToken_(e.parameter.token);
+    if (!verifyTokenCheck.ok) {
+      return ContentService
+        .createTextOutput(JSON.stringify(verifyTokenCheck, null, 2))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    return ContentService
+      .createTextOutput(JSON.stringify(apiVerifySmokeResources(e.parameter.sheetId || ''), null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   if (e && e.parameter && e.parameter.mode === 'health') {
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.1.0' }))
@@ -164,9 +175,91 @@ function apiCreateSmokeTest() {
   var result = apiCreateFormFlow(JSON.stringify(spec));
   result.smokeTest = true;
   result.startedAt = startedAt;
-  result.sideEffects = 'created one Google Form and one Google Sheet in the deploying account';
+  result.sideEffects = result.ok
+    ? 'created one Google Form and one Google Sheet in the deploying account'
+    : 'none confirmed; creation failed before success response';
   result.expectedSheets = ['Form Responses 1', 'Clean_Data', 'Question_Meta', 'Summary', 'Announcement', 'Generator_Log'];
   return result;
+}
+
+function apiAuthProbe() {
+  var checks = [];
+  checks.push(runAuthProbe_('PropertiesService script properties', function () {
+    PropertiesService.getScriptProperties().getProperty('AGENT_SMOKE_TOKEN');
+    return 'ok';
+  }));
+  checks.push(runAuthProbe_('FormApp.create', function () {
+    var form = FormApp.create('GAS FormFlow Auth Probe ' + new Date().toISOString());
+    DriveApp.getFileById(form.getId()).setTrashed(true);
+    return form.getId();
+  }));
+  checks.push(runAuthProbe_('SpreadsheetApp.create', function () {
+    var spreadsheet = SpreadsheetApp.create('GAS FormFlow Auth Probe ' + new Date().toISOString());
+    DriveApp.getFileById(spreadsheet.getId()).setTrashed(true);
+    return spreadsheet.getId();
+  }));
+  return {
+    ok: checks.every(function (check) { return check.ok; }),
+    checks: checks
+  };
+}
+
+function apiVerifySmokeResources(sheetId) {
+  if (!sheetId) {
+    return { ok: false, error: 'sheetId is required.' };
+  }
+  try {
+    var spreadsheet = SpreadsheetApp.openById(sheetId);
+    var sheetNames = spreadsheet.getSheets().map(function (sheet) { return sheet.getName(); });
+    var expectedSheets = ['Form Responses 1', 'Clean_Data', 'Question_Meta', 'Summary', 'Announcement', 'Generator_Log'];
+    var missingSheets = expectedSheets.filter(function (name) { return sheetNames.indexOf(name) === -1; });
+    var unexpectedResponseSheets = sheetNames.filter(function (name) {
+      return /^Form Responses \d+$/.test(name) && name !== 'Form Responses 1';
+    });
+    var cleanData = spreadsheet.getSheetByName('Clean_Data');
+    var questionMeta = spreadsheet.getSheetByName('Question_Meta');
+    var summary = spreadsheet.getSheetByName('Summary');
+    var announcement = spreadsheet.getSheetByName('Announcement');
+    var log = spreadsheet.getSheetByName('Generator_Log');
+    var cleanHeaders = cleanData ? cleanData.getRange(1, 1, 1, cleanData.getLastColumn()).getValues()[0] : [];
+    var questionMetaHeaders = questionMeta ? questionMeta.getRange(1, 1, 1, questionMeta.getLastColumn()).getValues()[0] : [];
+    var summaryRows = summary && summary.getLastRow() > 1 ? summary.getRange(1, 1, Math.min(summary.getLastRow(), 12), summary.getLastColumn()).getDisplayValues() : [];
+    var announcementText = announcement ? announcement.getRange(2, 1).getDisplayValue() : '';
+    var logRows = log ? Math.max(0, log.getLastRow() - 1) : 0;
+    var requiredCleanHeaders = ['timestamp', 'name', 'area', 'support', 'score', 'available_date', 'availability_grid'];
+    var missingCleanHeaders = requiredCleanHeaders.filter(function (name) { return cleanHeaders.indexOf(name) === -1; });
+    return {
+      ok: missingSheets.length === 0 && unexpectedResponseSheets.length === 0 && missingCleanHeaders.length === 0 && !!announcementText && logRows > 0,
+      spreadsheetName: spreadsheet.getName(),
+      sheetNames: sheetNames,
+      missingSheets: missingSheets,
+      unexpectedResponseSheets: unexpectedResponseSheets,
+      cleanHeaders: cleanHeaders,
+      missingCleanHeaders: missingCleanHeaders,
+      questionMetaHeaders: questionMetaHeaders,
+      summaryPreview: summaryRows,
+      announcementText: announcementText,
+      generatorLogRows: logRows
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error && error.message ? error.message : String(error)
+    };
+  }
+}
+
+function runAuthProbe_(name, fn) {
+  try {
+    return { name: name, ok: true, result: fn() };
+  } catch (error) {
+    return {
+      name: name,
+      ok: false,
+      message: error && error.message ? error.message : String(error),
+      stack: error && error.stack ? String(error.stack).split('\n').slice(0, 3) : []
+    };
+  }
 }
 
 function validateAgentSmokeToken_(providedToken) {
@@ -476,8 +569,8 @@ var SheetBuilder = (function () {
 
   function ensureSheets(spreadsheet) {
     var first = spreadsheet.getSheets()[0];
-    first.setName('Form Responses 1');
-    SHEETS.slice(1).forEach(function (name) {
+    first.setName('Clean_Data');
+    SHEETS.filter(function (name) { return name !== 'Form Responses 1' && name !== 'Clean_Data'; }).forEach(function (name) {
       var existing = spreadsheet.getSheetByName(name);
       if (!existing) spreadsheet.insertSheet(name);
     });
@@ -614,13 +707,13 @@ var SummaryBuilder = (function () {
       var primaryIndex = findDataIndex(spec, spec.analysis.primaryKey);
       if (primaryIndex !== -1) {
         var primaryColumn = SheetBuilder.columnLetter(primaryIndex + 2);
-        rows.push(['quality', spec.analysis.primaryKey, 'possibleDuplicates', '=COUNTIF(Clean_Data!' + primaryColumn + ':' + primaryColumn + ',Clean_Data!' + primaryColumn + '2)']);
+        rows.push(['quality', spec.analysis.primaryKey, 'possibleDuplicates', '=IF(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',"?*")=0,0,MAX(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',FILTER(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',Clean_Data!' + primaryColumn + '2:' + primaryColumn + '<>""))))']);
       }
     }
     spec.items.filter(SheetBuilder.isDataItem).forEach(function (item, index) {
       if (!item.required) return;
       var column = SheetBuilder.columnLetter(index + 2);
-      rows.push(['quality', item.key, 'missingCount', '=COUNTBLANK(Clean_Data!' + column + '2:' + column + ')']);
+      rows.push(['quality', item.key, 'missingCount', '=MAX(0,$D$2-COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*"))']);
     });
     sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
     sheet.setFrozenRows(1);
@@ -647,8 +740,8 @@ var SummaryBuilder = (function () {
     }
     if (item.type === 'date' || item.type === 'time') {
       return [
-        ['field', item.key, 'filledCount', '=COUNTA(Clean_Data!' + column + '2:' + column + ')'],
-        ['field', item.key, 'uniqueValues', '=COUNTUNIQUE(Clean_Data!' + column + '2:' + column + ')']
+        ['field', item.key, 'filledCount', '=COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")'],
+        ['field', item.key, 'uniqueValues', '=IF(COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")=0,0,COUNTUNIQUE(FILTER(Clean_Data!' + column + '2:' + column + ',Clean_Data!' + column + '2:' + column + '<>"")))']
       ];
     }
     return [['field', item.key, summaryType, buildNote(item)]];

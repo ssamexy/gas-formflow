@@ -16,13 +16,13 @@ var SummaryBuilder = (function () {
       var primaryIndex = findDataIndex(spec, spec.analysis.primaryKey);
       if (primaryIndex !== -1) {
         var primaryColumn = SheetBuilder.columnLetter(primaryIndex + 2);
-        rows.push(['quality', spec.analysis.primaryKey, 'possibleDuplicates', '=COUNTIF(Clean_Data!' + primaryColumn + ':' + primaryColumn + ',Clean_Data!' + primaryColumn + '2)']);
+        rows.push(['quality', spec.analysis.primaryKey, 'possibleDuplicates', '=IF(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',"?*")=0,0,MAX(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',FILTER(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',Clean_Data!' + primaryColumn + '2:' + primaryColumn + '<>""))))']);
       }
     }
     spec.items.filter(SheetBuilder.isDataItem).forEach(function (item, index) {
       if (!item.required) return;
       var column = SheetBuilder.columnLetter(index + 2);
-      rows.push(['quality', item.key, 'missingCount', '=COUNTBLANK(Clean_Data!' + column + '2:' + column + ')']);
+      rows.push(['quality', item.key, 'missingCount', '=MAX(0,$D$2-COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*"))']);
     });
     sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
     sheet.setFrozenRows(1);
@@ -49,8 +49,8 @@ var SummaryBuilder = (function () {
     }
     if (item.type === 'date' || item.type === 'time') {
       return [
-        ['field', item.key, 'filledCount', '=COUNTA(Clean_Data!' + column + '2:' + column + ')'],
-        ['field', item.key, 'uniqueValues', '=COUNTUNIQUE(Clean_Data!' + column + '2:' + column + ')']
+        ['field', item.key, 'filledCount', '=COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")'],
+        ['field', item.key, 'uniqueValues', '=IF(COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")=0,0,COUNTUNIQUE(FILTER(Clean_Data!' + column + '2:' + column + ',Clean_Data!' + column + '2:' + column + '<>"")))']
       ];
     }
     return [['field', item.key, summaryType, buildNote(item)]];
