@@ -2,6 +2,8 @@
 
 This project is designed so an AI agent can validate most behavior without opening the Apps Script editor.
 
+Use agent validation mode only temporarily. Build with `npm run build:agent`, deploy, run checks, then return to `npm run build:private` and push the private manifest back to Apps Script. See [Deployment Modes](deployment-modes.md).
+
 ## Public Test Modes
 
 When deployed as a Web App, these URLs are safe for automated checks:

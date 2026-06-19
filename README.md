@@ -139,6 +139,32 @@ TEST_WEB_APP_URL="https://script.google.com/macros/s/DEPLOYMENT_ID/exec" npm run
 
 如果 HTTP smoke test 回 Google 登入頁或 403，代表 Google 的 Apps Script deployment access 在程式碼執行前就擋住匿名請求。這時需要用已登入且有權限的瀏覽器 session 測，或到 Apps Script UI 調整 Web App 存取權。
 
+## 部署模式
+
+本 repo 使用同一套程式碼、兩種 manifest：
+
+- `private`：預設模式，給小白使用者與日常自架使用，Web App access 為 `MYSELF`。
+- `agent`：短暫公開給 AI agent 驗證 Web URL，Web App access 為 `ANYONE`，但建立資源的 smoke endpoint 必須帶 token。
+
+常用命令：
+
+```bash
+npm run build:private
+npm run build:agent
+npm run check
+```
+
+驗證完成後必須跑回：
+
+```bash
+npm run build:private
+clasp push -f
+```
+
+同時要下架暫時公開的 agent deployment；deployment ID 只留在本機，不要貼到聊天、issue 或文件。
+
+詳細流程見 [Deployment Modes](docs/deployment-modes.md)。
+
 完整建立流程可用以下有副作用 endpoint 驗證，會在部署者帳號建立一份測試 Form/Sheet：
 
 ```text

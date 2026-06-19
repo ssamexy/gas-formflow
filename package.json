@@ -4,9 +4,11 @@
   "private": false,
   "description": "Self-hosted Google Apps Script form workflow generator.",
   "scripts": {
-    "build": "node tools/build-dist.js",
+    "build": "node tools/build-dist.js --mode=private",
+    "build:private": "node tools/build-dist.js --mode=private",
+    "build:agent": "node tools/build-dist.js --mode=agent",
     "validate": "node tools/validate-project.js",
-    "check": "npm run build && npm run validate",
+    "check": "npm run build:private && npm run validate && npm run build:agent && npm run validate && npm run build:private && npm run validate",
     "smoke:agent": "node tools/agent-smoke.js"
   },
   "keywords": [

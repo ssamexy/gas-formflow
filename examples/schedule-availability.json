@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "1.0",
+  "title": "課程時段與交通調查",
+  "description": "收集可參加日期、時間與交通需求。",
+  "notice": "實際日期會依多數人可參加時段安排。",
+  "deadlineText": "請於週五前填寫。",
+  "confirmationMessage": "已收到你的時段回覆。",
+  "sheetName": "課程時段與交通調查回應",
+  "lineMessageTemplate": "【{title}】\n請填寫時段調查：{publishedUrl}\n{deadlineText}\n{notice}",
+  "analysis": {
+    "enabled": true,
+    "primaryKey": "name",
+    "generateCleanData": true,
+    "generateSummary": true,
+    "summaryFields": []
+  },
+  "items": [
+    {
+      "key": "intro_section",
+      "type": "sectionHeader",
+      "title": "基本資料",
+      "helpText": "請填寫姓名與聯絡方式。"
+    },
+    {
+      "key": "name",
+      "type": "shortText",
+      "title": "姓名",
+      "required": true
+    },
+    {
+      "key": "contact_time",
+      "type": "time",
+      "title": "方便聯絡時間",
+      "required": false,
+      "analysis": {
+        "summary": "countTimes"
+      }
+    },
+    {
+      "key": "page_availability",
+      "type": "pageBreak",
+      "title": "可參加時段"
+    },
+    {
+      "key": "preferred_date",
+      "type": "date",
+      "title": "最希望上課日期",
+      "required": true,
+      "analysis": {
+        "summary": "countDates"
+      }
+    },
+    {
+      "key": "availability_grid",
+      "type": "grid",
+      "title": "各時段可參加程度",
+      "required": true,
+      "rows": [
+        "週六上午",
+        "週六下午",
+        "週日上午",
+        "週日下午"
+      ],
+      "columns": [
+        "可以",
+        "可能可以",
+        "不行"
+      ]
+    },
+    {
+      "key": "transportation",
+      "type": "multipleChoice",
+      "title": "交通方式",
+      "required": true,
+      "options": [
+        "自行前往",
+        "需要接送",
+        "可協助接送"
+      ],
+      "analysis": {
+        "summary": "countOptions"
+      }
+    }
+  ]
+}

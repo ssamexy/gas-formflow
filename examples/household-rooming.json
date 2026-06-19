@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0",
+  "title": "營會家庭與房型調查",
+  "description": "協助統計家庭人數、房型需求與特殊注意事項。",
+  "deadlineText": "請於報名前完成。",
+  "lineMessageTemplate": "【{title}】\n請填寫房型需求：{publishedUrl}\n{deadlineText}",
+  "analysis": {
+    "enabled": true,
+    "primaryKey": "family_name",
+    "generateCleanData": true,
+    "generateSummary": true,
+    "summaryFields": []
+  },
+  "items": [
+    {
+      "key": "family_name",
+      "type": "shortText",
+      "title": "家庭代表姓名",
+      "required": true
+    },
+    {
+      "key": "adult_count",
+      "type": "scale",
+      "title": "成人數",
+      "required": true,
+      "lowerBound": 0,
+      "upperBound": 6,
+      "analysis": {
+        "summary": "averageAndDistribution"
+      }
+    },
+    {
+      "key": "child_count",
+      "type": "scale",
+      "title": "兒童數",
+      "required": true,
+      "lowerBound": 0,
+      "upperBound": 6,
+      "analysis": {
+        "summary": "averageAndDistribution"
+      }
+    },
+    {
+      "key": "room_type",
+      "type": "dropdown",
+      "title": "房型偏好",
+      "required": true,
+      "options": [
+        "雙人房",
+        "四人房",
+        "家庭房",
+        "可併房"
+      ],
+      "analysis": {
+        "summary": "countOptions"
+      }
+    },
+    {
+      "key": "needs",
+      "type": "checkbox",
+      "title": "特殊需求",
+      "required": false,
+      "options": [
+        "嬰兒床",
+        "低樓層",
+        "素食",
+        "無障礙空間"
+      ],
+      "analysis": {
+        "summary": "countCheckboxOptions"
+      }
+    },
+    {
+      "key": "note",
+      "type": "paragraph",
+      "title": "補充說明",
+      "required": false
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+var FORMFLOW_DEPLOY_MODE = typeof FORMFLOW_DEPLOY_MODE !== 'undefined' ? FORMFLOW_DEPLOY_MODE : 'private';
+
 function doGet(e) {
   if (e && e.parameter && e.parameter.mode === 'agent-test') {
     return ContentService
@@ -52,6 +54,13 @@ function setup() {
   };
 }
 
+function setupAgentSmokeToken(token) {
+  if (isAgentMode_()) {
+    throw new Error('Token setup is disabled while running in public agent validation mode.');
+  }
+  return setupAgentSmokeToken_(token);
+}
+
 function setupAgentSmokeToken_(token) {
   if (!token || String(token).length < 24) {
     throw new Error('Token must be at least 24 characters.');
@@ -79,6 +88,16 @@ function apiPreviewSpec(jsonText) {
 }
 
 function apiCreateFormFlow(jsonText) {
+  if (isAgentMode_()) {
+    return {
+      ok: false,
+      errors: ['公開 AI agent 驗證模式不允許未帶 token 的建立操作。請使用 token-protected create-smoke endpoint，或切回 private deployment。']
+    };
+  }
+  return createFormFlow_(jsonText);
+}
+
+function createFormFlow_(jsonText) {
   try {
     var validation = SchemaValidator.validateJsonText(jsonText);
     if (!validation.ok) return validation;
@@ -166,7 +185,7 @@ function apiCreateSmokeTest_() {
   var spec = buildSmokeSpec();
   spec.title = 'GAS FormFlow Smoke Test ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss');
   spec.sheetName = spec.title + ' Responses';
-  var result = apiCreateFormFlow(JSON.stringify(spec));
+  var result = createFormFlow_(JSON.stringify(spec));
   result.smokeTest = true;
   result.startedAt = startedAt;
   result.sideEffects = result.ok
@@ -236,6 +255,10 @@ function validateAgentSmokeToken_(providedToken) {
     };
   }
   return { ok: true };
+}
+
+function isAgentMode_() {
+  return String(FORMFLOW_DEPLOY_MODE || 'private') === 'agent';
 }
 
 function buildSmokeSpec() {
