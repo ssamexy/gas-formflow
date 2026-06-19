@@ -16,13 +16,13 @@ var SummaryBuilder = (function () {
       var primaryIndex = findDataIndex(spec, spec.analysis.primaryKey);
       if (primaryIndex !== -1) {
         var primaryColumn = SheetBuilder.columnLetter(primaryIndex + 2);
-        rows.push(['quality', spec.analysis.primaryKey, 'possibleDuplicates', '=IF(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',"?*")=0,0,MAX(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',FILTER(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',Clean_Data!' + primaryColumn + '2:' + primaryColumn + '<>""))))']);
+        rows.push(['quality', SheetBuilder.safeCellText(spec.analysis.primaryKey), 'possibleDuplicates', '=IF(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',"?*")=0,0,MAX(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',FILTER(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',Clean_Data!' + primaryColumn + '2:' + primaryColumn + '<>""))))']);
       }
     }
     spec.items.filter(SheetBuilder.isDataItem).forEach(function (item, index) {
       if (!item.required) return;
       var column = SheetBuilder.columnLetter(index + 2);
-      rows.push(['quality', item.key, 'missingCount', '=MAX(0,$D$2-COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*"))']);
+      rows.push(['quality', SheetBuilder.safeCellText(item.key), 'missingCount', '=MAX(0,$D$2-COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*"))']);
     });
     sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
     sheet.setFrozenRows(1);
@@ -33,27 +33,27 @@ var SummaryBuilder = (function () {
     var column = SheetBuilder.columnLetter(dataColumn);
     if (['multipleChoice', 'dropdown'].indexOf(item.type) !== -1) {
       return (item.options || []).map(function (option) {
-        return ['field', item.key, option, '=COUNTIF(Clean_Data!' + column + ':' + column + ',"' + escapeFormulaText(option) + '")'];
+        return ['field', SheetBuilder.safeCellText(item.key), SheetBuilder.safeCellText(option), '=COUNTIF(Clean_Data!' + column + ':' + column + ',"' + escapeFormulaText(option) + '")'];
       });
     }
     if (item.type === 'checkbox') {
       return (item.options || []).map(function (option) {
-        return ['field', item.key, option, '=COUNTIF(Clean_Data!' + column + ':' + column + ',"*' + escapeFormulaText(option) + '*")'];
+        return ['field', SheetBuilder.safeCellText(item.key), SheetBuilder.safeCellText(option), '=COUNTIF(Clean_Data!' + column + ':' + column + ',"*' + escapeFormulaText(option) + '*")'];
       });
     }
     if (item.type === 'scale') {
       return [
-        ['field', item.key, 'average', '=IFERROR(AVERAGE(Clean_Data!' + column + '2:' + column + '),"")'],
-        ['field', item.key, 'responses', '=COUNT(Clean_Data!' + column + '2:' + column + ')']
+        ['field', SheetBuilder.safeCellText(item.key), 'average', '=IFERROR(AVERAGE(Clean_Data!' + column + '2:' + column + '),"")'],
+        ['field', SheetBuilder.safeCellText(item.key), 'responses', '=COUNT(Clean_Data!' + column + '2:' + column + ')']
       ];
     }
     if (item.type === 'date' || item.type === 'time') {
       return [
-        ['field', item.key, 'filledCount', '=COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")'],
-        ['field', item.key, 'uniqueValues', '=IF(COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")=0,0,COUNTUNIQUE(FILTER(Clean_Data!' + column + '2:' + column + ',Clean_Data!' + column + '2:' + column + '<>"")))']
+        ['field', SheetBuilder.safeCellText(item.key), 'filledCount', '=COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")'],
+        ['field', SheetBuilder.safeCellText(item.key), 'uniqueValues', '=IF(COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")=0,0,COUNTUNIQUE(FILTER(Clean_Data!' + column + '2:' + column + ',Clean_Data!' + column + '2:' + column + '<>"")))']
       ];
     }
-    return [['field', item.key, summaryType, buildNote(item)]];
+    return [['field', SheetBuilder.safeCellText(item.key), SheetBuilder.safeCellText(summaryType), SheetBuilder.safeCellText(buildNote(item))]];
   }
 
   function buildNote(item) {

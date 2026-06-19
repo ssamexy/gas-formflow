@@ -56,13 +56,13 @@ var SheetBuilder = (function () {
     var rows = [['key', 'title', 'type', 'required', 'options', 'analysis_role', 'summary_type']];
     spec.items.filter(isDataItem).forEach(function (item) {
       rows.push([
-        item.key,
-        item.title || '',
-        item.type,
+        safeCellText(item.key),
+        safeCellText(item.title || ''),
+        safeCellText(item.type),
         !!item.required,
-        JSON.stringify(item.options || item.rows || []),
-        item.analysis && item.analysis.role ? item.analysis.role : '',
-        item.analysis && item.analysis.summary ? item.analysis.summary : inferSummaryType(item)
+        safeCellText(JSON.stringify(item.options || item.rows || [])),
+        safeCellText(item.analysis && item.analysis.role ? item.analysis.role : ''),
+        safeCellText(item.analysis && item.analysis.summary ? item.analysis.summary : inferSummaryType(item))
       ]);
     });
     sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
@@ -72,7 +72,7 @@ var SheetBuilder = (function () {
   function writeAnnouncement(spreadsheet, announcement) {
     var sheet = spreadsheet.getSheetByName('Announcement');
     sheet.clear();
-    sheet.getRange(1, 1, 2, 1).setValues([['announcement'], [announcement || '']]);
+    sheet.getRange(1, 1, 2, 1).setValues([['announcement'], [safeCellText(announcement || '')]]);
     sheet.setColumnWidth(1, 700);
   }
 
@@ -85,7 +85,7 @@ var SheetBuilder = (function () {
 
   function writeLog(spreadsheet, data) {
     var sheet = spreadsheet.getSheetByName('Generator_Log');
-    sheet.appendRow([new Date(), data.title || '', data.publishedUrl || '', data.editUrl || '', data.sheetUrl || '']);
+    sheet.appendRow([new Date(), safeCellText(data.title || ''), data.publishedUrl || '', data.editUrl || '', data.sheetUrl || '']);
   }
 
   function renderTemplate(template, values) {
@@ -126,6 +126,11 @@ var SheetBuilder = (function () {
     return ['sectionHeader', 'pageBreak'].indexOf(item.type) === -1;
   }
 
+  function safeCellText(value) {
+    var text = String(value == null ? '' : value);
+    return /^[=+\-@]/.test(text) ? "'" + text : text;
+  }
+
   function columnLetter(columnNumber) {
     var letter = '';
     while (columnNumber > 0) {
@@ -144,6 +149,7 @@ var SheetBuilder = (function () {
     renderTemplate: renderTemplate,
     inferSummaryType: inferSummaryType,
     isDataItem: isDataItem,
-    columnLetter: columnLetter
+    columnLetter: columnLetter,
+    safeCellText: safeCellText
   };
 })();

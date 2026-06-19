@@ -26,7 +26,7 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     return ContentService
-      .createTextOutput(JSON.stringify(apiCreateSmokeTest(), null, 2))
+      .createTextOutput(JSON.stringify(apiCreateSmokeTest_(), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
   }
   if (e && e.parameter && e.parameter.mode === 'verify-smoke') {
@@ -37,7 +37,7 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     return ContentService
-      .createTextOutput(JSON.stringify(apiVerifySmokeResources(e.parameter.sheetId || ''), null, 2))
+      .createTextOutput(JSON.stringify(apiVerifySmokeResources_(e.parameter.sheetId || ''), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
   }
   if (e && e.parameter && e.parameter.mode === 'health') {
@@ -58,7 +58,7 @@ function setup() {
   };
 }
 
-function setupAgentSmokeToken(token) {
+function setupAgentSmokeToken_(token) {
   if (!token || String(token).length < 24) {
     throw new Error('Token must be at least 24 characters.');
   }
@@ -167,7 +167,7 @@ function apiSelfTest() {
   };
 }
 
-function apiCreateSmokeTest() {
+function apiCreateSmokeTest_() {
   var startedAt = new Date().toISOString();
   var spec = buildSmokeSpec();
   spec.title = 'GAS FormFlow Smoke Test ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss');
@@ -182,29 +182,7 @@ function apiCreateSmokeTest() {
   return result;
 }
 
-function apiAuthProbe() {
-  var checks = [];
-  checks.push(runAuthProbe_('PropertiesService script properties', function () {
-    PropertiesService.getScriptProperties().getProperty('AGENT_SMOKE_TOKEN');
-    return 'ok';
-  }));
-  checks.push(runAuthProbe_('FormApp.create', function () {
-    var form = FormApp.create('GAS FormFlow Auth Probe ' + new Date().toISOString());
-    DriveApp.getFileById(form.getId()).setTrashed(true);
-    return form.getId();
-  }));
-  checks.push(runAuthProbe_('SpreadsheetApp.create', function () {
-    var spreadsheet = SpreadsheetApp.create('GAS FormFlow Auth Probe ' + new Date().toISOString());
-    DriveApp.getFileById(spreadsheet.getId()).setTrashed(true);
-    return spreadsheet.getId();
-  }));
-  return {
-    ok: checks.every(function (check) { return check.ok; }),
-    checks: checks
-  };
-}
-
-function apiVerifySmokeResources(sheetId) {
+function apiVerifySmokeResources_(sheetId) {
   if (!sheetId) {
     return { ok: false, error: 'sheetId is required.' };
   }
@@ -245,19 +223,6 @@ function apiVerifySmokeResources(sheetId) {
     return {
       ok: false,
       error: error && error.message ? error.message : String(error)
-    };
-  }
-}
-
-function runAuthProbe_(name, fn) {
-  try {
-    return { name: name, ok: true, result: fn() };
-  } catch (error) {
-    return {
-      name: name,
-      ok: false,
-      message: error && error.message ? error.message : String(error),
-      stack: error && error.stack ? String(error.stack).split('\n').slice(0, 3) : []
     };
   }
 }
@@ -325,10 +290,23 @@ var SchemaValidator = (function () {
   };
   var OPTION_TYPES = { multipleChoice: true, checkbox: true, dropdown: true };
   var GRID_TYPES = { grid: true, checkboxGrid: true };
+  var LIMITS = {
+    maxJsonChars: 120000,
+    maxTitleChars: 180,
+    maxDescriptionChars: 5000,
+    maxItems: 120,
+    maxOptions: 80,
+    maxGridRows: 50,
+    maxGridColumns: 20,
+    maxTextChars: 1200
+  };
 
   function validateJsonText(jsonText) {
     if (!jsonText || String(jsonText).trim() === '') {
       return fail(['請先貼上 GAS FormFlow JSON。']);
+    }
+    if (String(jsonText).length > LIMITS.maxJsonChars) {
+      return fail(['JSON 太大，v1 目前不支援超大型問卷。請先縮減題目或分批建立。']);
     }
     var spec;
     try {
@@ -350,9 +328,14 @@ var SchemaValidator = (function () {
       errors.push('schemaVersion 目前只支援 "1.0"。');
     }
     if (!hasText(spec.title)) errors.push('title 為必填。');
+    if (hasText(spec.title) && spec.title.length > LIMITS.maxTitleChars) errors.push('title 過長，請縮短到 ' + LIMITS.maxTitleChars + ' 字以內。');
+    if (spec.description && String(spec.description).length > LIMITS.maxDescriptionChars) errors.push('description 過長，請縮短。');
     if (!Array.isArray(spec.items) || spec.items.length === 0) {
       errors.push('items 必須是非空陣列。');
       return errors;
+    }
+    if (spec.items.length > LIMITS.maxItems) {
+      errors.push('題目數量超過 v1 上限 ' + LIMITS.maxItems + ' 題，請拆成多個表單。');
     }
 
     var keys = {};
@@ -375,11 +358,22 @@ var SchemaValidator = (function () {
         errors.push(label + ' 的 type "' + item.type + '" 目前不支援，請先產生基本表單後，到 Google Forms 後台手動微調。');
       }
       if (!hasText(item.title) && item.type !== 'pageBreak') errors.push(label + ' 缺少 title。');
+      if (hasText(item.title) && item.title.length > LIMITS.maxTextChars) errors.push(label + ' 的 title 過長。');
+      if (item.helpText && String(item.helpText).length > LIMITS.maxTextChars) errors.push(label + ' 的 helpText 過長。');
       if (OPTION_TYPES[item.type] && !hasStringArray(item.options)) {
         errors.push(label + ' 是選項題，必須提供 options array。');
       }
+      if (OPTION_TYPES[item.type] && Array.isArray(item.options) && item.options.length > LIMITS.maxOptions) {
+        errors.push(label + ' 的 options 超過上限 ' + LIMITS.maxOptions + ' 個。');
+      }
       if (GRID_TYPES[item.type] && (!hasStringArray(item.rows) || !hasStringArray(item.columns))) {
         errors.push(label + ' 是 grid 題，必須提供 rows / columns。');
+      }
+      if (GRID_TYPES[item.type] && Array.isArray(item.rows) && item.rows.length > LIMITS.maxGridRows) {
+        errors.push(label + ' 的 rows 超過上限 ' + LIMITS.maxGridRows + ' 列。');
+      }
+      if (GRID_TYPES[item.type] && Array.isArray(item.columns) && item.columns.length > LIMITS.maxGridColumns) {
+        errors.push(label + ' 的 columns 超過上限 ' + LIMITS.maxGridColumns + ' 欄。');
       }
       if (item.type === 'scale') {
         if (item.lowerBound && (item.lowerBound < 0 || item.lowerBound > 10)) errors.push(label + ' lowerBound 必須在 0 到 10。');
@@ -595,13 +589,13 @@ var SheetBuilder = (function () {
     var rows = [['key', 'title', 'type', 'required', 'options', 'analysis_role', 'summary_type']];
     spec.items.filter(isDataItem).forEach(function (item) {
       rows.push([
-        item.key,
-        item.title || '',
-        item.type,
+        safeCellText(item.key),
+        safeCellText(item.title || ''),
+        safeCellText(item.type),
         !!item.required,
-        JSON.stringify(item.options || item.rows || []),
-        item.analysis && item.analysis.role ? item.analysis.role : '',
-        item.analysis && item.analysis.summary ? item.analysis.summary : inferSummaryType(item)
+        safeCellText(JSON.stringify(item.options || item.rows || [])),
+        safeCellText(item.analysis && item.analysis.role ? item.analysis.role : ''),
+        safeCellText(item.analysis && item.analysis.summary ? item.analysis.summary : inferSummaryType(item))
       ]);
     });
     sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
@@ -611,7 +605,7 @@ var SheetBuilder = (function () {
   function writeAnnouncement(spreadsheet, announcement) {
     var sheet = spreadsheet.getSheetByName('Announcement');
     sheet.clear();
-    sheet.getRange(1, 1, 2, 1).setValues([['announcement'], [announcement || '']]);
+    sheet.getRange(1, 1, 2, 1).setValues([['announcement'], [safeCellText(announcement || '')]]);
     sheet.setColumnWidth(1, 700);
   }
 
@@ -624,7 +618,7 @@ var SheetBuilder = (function () {
 
   function writeLog(spreadsheet, data) {
     var sheet = spreadsheet.getSheetByName('Generator_Log');
-    sheet.appendRow([new Date(), data.title || '', data.publishedUrl || '', data.editUrl || '', data.sheetUrl || '']);
+    sheet.appendRow([new Date(), safeCellText(data.title || ''), data.publishedUrl || '', data.editUrl || '', data.sheetUrl || '']);
   }
 
   function renderTemplate(template, values) {
@@ -665,6 +659,11 @@ var SheetBuilder = (function () {
     return ['sectionHeader', 'pageBreak'].indexOf(item.type) === -1;
   }
 
+  function safeCellText(value) {
+    var text = String(value == null ? '' : value);
+    return /^[=+\-@]/.test(text) ? "'" + text : text;
+  }
+
   function columnLetter(columnNumber) {
     var letter = '';
     while (columnNumber > 0) {
@@ -683,7 +682,8 @@ var SheetBuilder = (function () {
     renderTemplate: renderTemplate,
     inferSummaryType: inferSummaryType,
     isDataItem: isDataItem,
-    columnLetter: columnLetter
+    columnLetter: columnLetter,
+    safeCellText: safeCellText
   };
 })();
 
@@ -707,13 +707,13 @@ var SummaryBuilder = (function () {
       var primaryIndex = findDataIndex(spec, spec.analysis.primaryKey);
       if (primaryIndex !== -1) {
         var primaryColumn = SheetBuilder.columnLetter(primaryIndex + 2);
-        rows.push(['quality', spec.analysis.primaryKey, 'possibleDuplicates', '=IF(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',"?*")=0,0,MAX(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',FILTER(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',Clean_Data!' + primaryColumn + '2:' + primaryColumn + '<>""))))']);
+        rows.push(['quality', SheetBuilder.safeCellText(spec.analysis.primaryKey), 'possibleDuplicates', '=IF(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',"?*")=0,0,MAX(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',FILTER(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',Clean_Data!' + primaryColumn + '2:' + primaryColumn + '<>""))))']);
       }
     }
     spec.items.filter(SheetBuilder.isDataItem).forEach(function (item, index) {
       if (!item.required) return;
       var column = SheetBuilder.columnLetter(index + 2);
-      rows.push(['quality', item.key, 'missingCount', '=MAX(0,$D$2-COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*"))']);
+      rows.push(['quality', SheetBuilder.safeCellText(item.key), 'missingCount', '=MAX(0,$D$2-COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*"))']);
     });
     sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
     sheet.setFrozenRows(1);
@@ -724,27 +724,27 @@ var SummaryBuilder = (function () {
     var column = SheetBuilder.columnLetter(dataColumn);
     if (['multipleChoice', 'dropdown'].indexOf(item.type) !== -1) {
       return (item.options || []).map(function (option) {
-        return ['field', item.key, option, '=COUNTIF(Clean_Data!' + column + ':' + column + ',"' + escapeFormulaText(option) + '")'];
+        return ['field', SheetBuilder.safeCellText(item.key), SheetBuilder.safeCellText(option), '=COUNTIF(Clean_Data!' + column + ':' + column + ',"' + escapeFormulaText(option) + '")'];
       });
     }
     if (item.type === 'checkbox') {
       return (item.options || []).map(function (option) {
-        return ['field', item.key, option, '=COUNTIF(Clean_Data!' + column + ':' + column + ',"*' + escapeFormulaText(option) + '*")'];
+        return ['field', SheetBuilder.safeCellText(item.key), SheetBuilder.safeCellText(option), '=COUNTIF(Clean_Data!' + column + ':' + column + ',"*' + escapeFormulaText(option) + '*")'];
       });
     }
     if (item.type === 'scale') {
       return [
-        ['field', item.key, 'average', '=IFERROR(AVERAGE(Clean_Data!' + column + '2:' + column + '),"")'],
-        ['field', item.key, 'responses', '=COUNT(Clean_Data!' + column + '2:' + column + ')']
+        ['field', SheetBuilder.safeCellText(item.key), 'average', '=IFERROR(AVERAGE(Clean_Data!' + column + '2:' + column + '),"")'],
+        ['field', SheetBuilder.safeCellText(item.key), 'responses', '=COUNT(Clean_Data!' + column + '2:' + column + ')']
       ];
     }
     if (item.type === 'date' || item.type === 'time') {
       return [
-        ['field', item.key, 'filledCount', '=COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")'],
-        ['field', item.key, 'uniqueValues', '=IF(COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")=0,0,COUNTUNIQUE(FILTER(Clean_Data!' + column + '2:' + column + ',Clean_Data!' + column + '2:' + column + '<>"")))']
+        ['field', SheetBuilder.safeCellText(item.key), 'filledCount', '=COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")'],
+        ['field', SheetBuilder.safeCellText(item.key), 'uniqueValues', '=IF(COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")=0,0,COUNTUNIQUE(FILTER(Clean_Data!' + column + '2:' + column + ',Clean_Data!' + column + '2:' + column + '<>"")))']
       ];
     }
-    return [['field', item.key, summaryType, buildNote(item)]];
+    return [['field', SheetBuilder.safeCellText(item.key), SheetBuilder.safeCellText(summaryType), SheetBuilder.safeCellText(buildNote(item))]];
   }
 
   function buildNote(item) {

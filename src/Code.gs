@@ -20,7 +20,7 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     return ContentService
-      .createTextOutput(JSON.stringify(apiCreateSmokeTest(), null, 2))
+      .createTextOutput(JSON.stringify(apiCreateSmokeTest_(), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
   }
   if (e && e.parameter && e.parameter.mode === 'verify-smoke') {
@@ -31,7 +31,7 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     return ContentService
-      .createTextOutput(JSON.stringify(apiVerifySmokeResources(e.parameter.sheetId || ''), null, 2))
+      .createTextOutput(JSON.stringify(apiVerifySmokeResources_(e.parameter.sheetId || ''), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
   }
   if (e && e.parameter && e.parameter.mode === 'health') {
@@ -52,7 +52,7 @@ function setup() {
   };
 }
 
-function setupAgentSmokeToken(token) {
+function setupAgentSmokeToken_(token) {
   if (!token || String(token).length < 24) {
     throw new Error('Token must be at least 24 characters.');
   }
@@ -161,7 +161,7 @@ function apiSelfTest() {
   };
 }
 
-function apiCreateSmokeTest() {
+function apiCreateSmokeTest_() {
   var startedAt = new Date().toISOString();
   var spec = buildSmokeSpec();
   spec.title = 'GAS FormFlow Smoke Test ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss');
@@ -176,29 +176,7 @@ function apiCreateSmokeTest() {
   return result;
 }
 
-function apiAuthProbe() {
-  var checks = [];
-  checks.push(runAuthProbe_('PropertiesService script properties', function () {
-    PropertiesService.getScriptProperties().getProperty('AGENT_SMOKE_TOKEN');
-    return 'ok';
-  }));
-  checks.push(runAuthProbe_('FormApp.create', function () {
-    var form = FormApp.create('GAS FormFlow Auth Probe ' + new Date().toISOString());
-    DriveApp.getFileById(form.getId()).setTrashed(true);
-    return form.getId();
-  }));
-  checks.push(runAuthProbe_('SpreadsheetApp.create', function () {
-    var spreadsheet = SpreadsheetApp.create('GAS FormFlow Auth Probe ' + new Date().toISOString());
-    DriveApp.getFileById(spreadsheet.getId()).setTrashed(true);
-    return spreadsheet.getId();
-  }));
-  return {
-    ok: checks.every(function (check) { return check.ok; }),
-    checks: checks
-  };
-}
-
-function apiVerifySmokeResources(sheetId) {
+function apiVerifySmokeResources_(sheetId) {
   if (!sheetId) {
     return { ok: false, error: 'sheetId is required.' };
   }
@@ -239,19 +217,6 @@ function apiVerifySmokeResources(sheetId) {
     return {
       ok: false,
       error: error && error.message ? error.message : String(error)
-    };
-  }
-}
-
-function runAuthProbe_(name, fn) {
-  try {
-    return { name: name, ok: true, result: fn() };
-  } catch (error) {
-    return {
-      name: name,
-      ok: false,
-      message: error && error.message ? error.message : String(error),
-      stack: error && error.stack ? String(error.stack).split('\n').slice(0, 3) : []
     };
   }
 }
