@@ -4,7 +4,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const required = [
   'README.md',
-  '需求書.md',
+  'product-requirements.md',
   'src/Code.gs',
   'src/FormBuilder.gs',
   'src/SheetBuilder.gs',

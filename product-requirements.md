@@ -230,7 +230,7 @@ LLM 只負責需求理解、JSON 生成、文字整理、語意摘要。
 ```text
 gas-formflow/
   README.md
-  需求書.md
+  product-requirements.md
 
   src/
     Code.gs
