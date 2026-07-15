@@ -124,9 +124,11 @@ QR code 會由 Web App 在瀏覽器內使用內嵌的 Nayuki QR Code generator v
 
 可選擇使用自己的 Google Gemini 或 Groq API Key：
 
-- 依 provider 動態偵測該 Key 可見的文字生成模型。Gemini 會篩選 `generateContent`；Groq 會排除明顯的語音／音訊模型。
-- 從清單選擇模型，將 Key 與模型儲存在自己的 Apps Script `ScriptProperties`。
-- 輸入自然語言需求，直接產生並驗證 FormFlow JSON。
+- Key 使用密碼欄輸入並以獨立按鈕安全儲存；成功後欄位立即清空，前端只知道是否已保存。
+- 依 provider 動態偵測適合表單討論與 JSON 轉換的模型，選定模型後另行儲存。
+- 在瀏覽器內與 AI 多輪討論白話文表單雛型；對話不寫入 `ScriptProperties`，聊天階段不會改動 JSON。
+- 使用者明確按下「我同意目前雛型，轉成 JSON」後，才轉換、驗證並寫入獨立 JSON 編輯區。
+- JSON 編輯區也接受其他 AI 產生的 JSON，並可在右側預覽。
 - Key 不會回傳前端、寫入 log 或放進 API URL；公開 `agent` 模式停用所有 AI 功能。
 
 模型出現在清單中不代表一定具有免費額度；free tier、地區限制與 quota 由 Google 決定。完整設定方式：

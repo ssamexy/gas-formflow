@@ -21,6 +21,24 @@ var GroqService = (function () {
       .sort(function (a, b) { return a.label.localeCompare(b.label); });
   }
 
+  function saveApiKey(apiKey) {
+    var resolvedKey = resolveApiKey(apiKey);
+    var models = listModels(resolvedKey);
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(API_KEY_PROPERTY, resolvedKey);
+    props.deleteProperty(MODEL_PROPERTY);
+    return { settings: getSettings(), models: models };
+  }
+
+  function saveModel(modelName) {
+    var normalizedModel = normalizeModelName(modelName);
+    var models = listModels('');
+    var isAvailable = models.some(function (model) { return model.name === normalizedModel; });
+    if (!isAvailable) throw new Error('AI_MODEL|The selected model is not available for this API key.');
+    PropertiesService.getScriptProperties().setProperty(MODEL_PROPERTY, normalizedModel);
+    return getSettings();
+  }
+
   function saveSettings(apiKey, modelName) {
     var resolvedKey = resolveApiKey(apiKey);
     var normalizedModel = normalizeModelName(modelName);
@@ -61,10 +79,24 @@ var GroqService = (function () {
     return AiPrompt.validateGeneratedSpec(extractResponseText(response), model);
   }
 
+  function discussForm(messages, modelName) {
+    var apiKey = resolveApiKey('');
+    var model = normalizeModelName(modelName || getSettings().model);
+    var response = requestJson('/chat/completions', {
+      method: 'post',
+      payload: {
+        model: model,
+        messages: [{ role: 'system', content: AiPrompt.buildDiscussionSystemPrompt() }].concat(messages),
+        temperature: 0.4
+      }
+    }, apiKey);
+    return extractResponseText(response);
+  }
+
   function isTextGenerationModel(model) {
     var id = String(model && model.id || '').toLowerCase();
     if (!id || model.active === false) return false;
-    return !/(whisper|speech|audio|tts|guard|safeguard)/.test(id);
+    return !/(whisper|speech|audio|tts|orpheus|guard|safeguard)/.test(id);
   }
 
   function toModelOption(model) {
@@ -134,15 +166,18 @@ var GroqService = (function () {
   function extractResponseText(response) {
     var choices = response && response.choices ? response.choices : [];
     var text = choices[0] && choices[0].message ? String(choices[0].message.content || '').trim() : '';
-    if (!text) throw new Error('AI_RESPONSE|Groq returned no JSON content.');
+    if (!text) throw new Error('AI_RESPONSE|Groq returned no content.');
     return text;
   }
 
   return {
     getSettings: getSettings,
     listModels: listModels,
+    saveApiKey: saveApiKey,
+    saveModel: saveModel,
     saveSettings: saveSettings,
     clearSettings: clearSettings,
+    discussForm: discussForm,
     generateSpec: generateSpec
   };
 })();

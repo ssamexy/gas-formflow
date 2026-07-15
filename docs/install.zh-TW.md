@@ -41,4 +41,4 @@
 
 ## 選用：Gemini 或 Groq API
 
-更新到 v2 後請重新執行授權，允許 Apps Script 使用外部 HTTPS 請求。接著可在 Web App 的「AI 產生 JSON（v2）」選擇 provider、貼上自己的 Key、偵測模型並儲存。詳見 [Gemini API 指南](ai-gemini.zh-TW.md)與 [Groq/ZDR 指南](ai-groq.zh-TW.md)。
+更新到 v2 後請重新執行授權，允許 Apps Script 使用外部 HTTPS 請求。接著可在 Web App 的「API Key 與模型設定」以密碼欄輸入自己的 Key、按下安全儲存、偵測並保存模型，再與 AI 多輪討論白話文雛型。只有明確核准後才會轉入獨立 JSON 編輯區。詳見 [Gemini API 指南](ai-gemini.zh-TW.md)與 [Groq/ZDR 指南](ai-groq.zh-TW.md)。

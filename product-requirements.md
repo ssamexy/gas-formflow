@@ -743,7 +743,22 @@ JSON 修復
 
 ## LLM API v2
 
-目前 v2 已提供 Google Gemini 與 Groq BYOK 流程：各 provider 的 Key 分開儲存於 Apps Script Properties、動態偵測模型、選擇模型，以及自然語言需求產生並驗證 JSON spec。Groq provider 相容其 OpenAI-style API，並在文件中說明 ZDR 必須於 Groq Data Controls 明確啟用。provider 邊界保留給後續其他 LLM API。
+目前 v2 已提供 Google Gemini 與 Groq BYOK 流程。各 provider 的 Key 分開儲存於 Apps Script Properties，前端以密碼欄輸入並由獨立按鈕儲存，成功後立即清空且不回填。模型清單依 Key 動態偵測，模型另行選擇與保存。
+
+主要互動流程必須由使用者掌控：
+
+```text
+安全儲存 Key
+→ 偵測並保存模型
+→ 與 AI 多輪討論需求
+→ AI 持續整理白話文「目前表單雛型」
+→ 使用者明確同意
+→ AI 將核准雛型轉成並驗證 JSON
+→ 寫入獨立 JSON 編輯區
+→ 右側預覽
+```
+
+聊天階段不得直接產生或覆寫 JSON。聊天紀錄只保留於目前瀏覽器分頁，不寫入 Script Properties。JSON 編輯區必須保持獨立，允許使用者貼入其他 AI 產生的 JSON。Groq provider 相容其 OpenAI-style API，並在文件中說明 ZDR 必須於 Groq Data Controls 明確啟用。
 
 ### 後續規劃
 
@@ -754,7 +769,7 @@ API key 儲存在使用者自己的 Apps Script Properties。
 LLM 功能可包含：
 
 ```text
-自然語言需求 → JSON spec
+多輪需求討論 → 白話文雛型 → 使用者核准 → JSON spec
 JSON 修復與補完
 表單設計建議
 提醒不利統計的題型

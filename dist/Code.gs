@@ -45,7 +45,7 @@ function doGet(e) {
   }
   if (e && e.parameter && e.parameter.mode === 'health') {
     return ContentService
-      .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.2.0' }))
+      .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.3.0' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
   return HtmlService.createTemplateFromFile('Index').evaluate()
@@ -110,6 +110,18 @@ function apiListAiModels(providerId, apiKey) {
   });
 }
 
+function apiSaveAiKey(providerId, apiKey) {
+  return runPrivateAiOperation_(function () {
+    return AiService.saveApiKey(providerId, apiKey);
+  });
+}
+
+function apiSaveAiModel(providerId, modelName) {
+  return runPrivateAiOperation_(function () {
+    return AiService.saveModel(providerId, modelName);
+  });
+}
+
 function apiSaveAiSettings(providerId, apiKey, modelName) {
   return runPrivateAiOperation_(function () {
     return AiService.saveSettings(providerId, apiKey, modelName);
@@ -119,6 +131,18 @@ function apiSaveAiSettings(providerId, apiKey, modelName) {
 function apiClearAiSettings(providerId) {
   return runPrivateAiOperation_(function () {
     return AiService.clearSettings(providerId);
+  });
+}
+
+function apiDiscussFormWithAi(providerId, messages, modelName) {
+  return runPrivateAiOperation_(function () {
+    return AiService.discussForm(providerId, messages, modelName);
+  });
+}
+
+function apiGenerateSpecFromOutline(providerId, outline, modelName) {
+  return runPrivateAiOperation_(function () {
+    return AiService.generateSpec(providerId, outline, modelName);
   });
 }
 
@@ -235,7 +259,7 @@ function apiSelfTest() {
   return {
     ok: allPassed,
     app: 'GAS FormFlow',
-    version: '0.2.0',
+    version: '0.3.0',
     startedAt: startedAt,
     finishedAt: new Date().toISOString(),
     sideEffects: 'none',
@@ -497,6 +521,17 @@ var SchemaValidator = (function () {
 
 // ===== src/AiPrompt.gs =====
 var AiPrompt = (function () {
+  function buildDiscussionSystemPrompt() {
+    return [
+      'You are a collaborative Google Form designer speaking Traditional Chinese.',
+      'Discuss the form with the user over multiple turns. Ask focused questions when requirements are unclear.',
+      'Keep a visible plain-language draft covering purpose, audience, form title, description, sections, questions, question types, required status, options, and analysis needs.',
+      'Every response must end with the latest consolidated draft, clearly labeled 「目前表單雛型」, even when you still have follow-up questions.',
+      'Do not output JSON, code fences, schema field names, or claim that the form has been created.',
+      'The user controls when the draft is approved and converted to JSON.'
+    ].join('\n');
+  }
+
   function buildFormFlowSystemPrompt() {
     return [
       'Create one valid GAS FormFlow schema v1 JSON object from the user requirement.',
@@ -535,6 +570,7 @@ var AiPrompt = (function () {
   }
 
   return {
+    buildDiscussionSystemPrompt: buildDiscussionSystemPrompt,
     buildFormFlowSystemPrompt: buildFormFlowSystemPrompt,
     validateGeneratedSpec: validateGeneratedSpec
   };
@@ -561,12 +597,30 @@ var GeminiService = (function () {
     var data = requestJson('/models?pageSize=1000', { method: 'get' }, resolvedKey);
     return (data.models || [])
       .filter(function (model) {
-        return (model.supportedGenerationMethods || []).indexOf('generateContent') !== -1;
+        return isFormDesignModel(model);
       })
       .map(toModelOption)
       .sort(function (a, b) {
         return a.label.localeCompare(b.label);
       });
+  }
+
+  function saveApiKey(apiKey) {
+    var resolvedKey = resolveApiKey(apiKey);
+    var models = listModels(resolvedKey);
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(API_KEY_PROPERTY, resolvedKey);
+    props.deleteProperty(MODEL_PROPERTY);
+    return { settings: getSettings(), models: models };
+  }
+
+  function saveModel(modelName) {
+    var normalizedModel = normalizeModelName(modelName);
+    var models = listModels('');
+    var isAvailable = models.some(function (model) { return model.name === normalizedModel; });
+    if (!isAvailable) throw new Error('AI_MODEL|The selected model is not available for this API key.');
+    PropertiesService.getScriptProperties().setProperty(MODEL_PROPERTY, normalizedModel);
+    return getSettings();
   }
 
   function saveSettings(apiKey, modelName) {
@@ -599,6 +653,31 @@ var GeminiService = (function () {
       payload: buildGenerationRequest(prompt)
     }, apiKey);
     return AiPrompt.validateGeneratedSpec(extractResponseText(response), model);
+  }
+
+  function discussForm(messages, modelName) {
+    var apiKey = resolveApiKey('');
+    var model = normalizeModelName(modelName || getSettings().model);
+    var response = requestJson('/' + model + ':generateContent', {
+      method: 'post',
+      payload: {
+        systemInstruction: { parts: [{ text: AiPrompt.buildDiscussionSystemPrompt() }] },
+        contents: messages.map(function (message) {
+          return {
+            role: message.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: message.content }]
+          };
+        }),
+        generationConfig: { temperature: 0.4, maxOutputTokens: 4096 }
+      }
+    }, apiKey);
+    return extractResponseText(response);
+  }
+
+  function isFormDesignModel(model) {
+    var name = String(model && model.name || '').toLowerCase();
+    if ((model.supportedGenerationMethods || []).indexOf('generateContent') === -1) return false;
+    return !/(tts|image|banana|lyria|robotics|computer-use|deep-research|antigravity|omni)/.test(name);
   }
 
   function toModelOption(model) {
@@ -685,15 +764,18 @@ var GeminiService = (function () {
     var candidates = response && response.candidates ? response.candidates : [];
     var parts = candidates[0] && candidates[0].content ? candidates[0].content.parts || [] : [];
     var text = parts.map(function (part) { return part.text || ''; }).join('').trim();
-    if (!text) throw new Error('AI_RESPONSE|Gemini returned no JSON content.');
+    if (!text) throw new Error('AI_RESPONSE|Gemini returned no content.');
     return text;
   }
 
   return {
     getSettings: getSettings,
     listModels: listModels,
+    saveApiKey: saveApiKey,
+    saveModel: saveModel,
     saveSettings: saveSettings,
     clearSettings: clearSettings,
+    discussForm: discussForm,
     generateSpec: generateSpec
   };
 })();
@@ -721,6 +803,24 @@ var GroqService = (function () {
       .filter(isTextGenerationModel)
       .map(toModelOption)
       .sort(function (a, b) { return a.label.localeCompare(b.label); });
+  }
+
+  function saveApiKey(apiKey) {
+    var resolvedKey = resolveApiKey(apiKey);
+    var models = listModels(resolvedKey);
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(API_KEY_PROPERTY, resolvedKey);
+    props.deleteProperty(MODEL_PROPERTY);
+    return { settings: getSettings(), models: models };
+  }
+
+  function saveModel(modelName) {
+    var normalizedModel = normalizeModelName(modelName);
+    var models = listModels('');
+    var isAvailable = models.some(function (model) { return model.name === normalizedModel; });
+    if (!isAvailable) throw new Error('AI_MODEL|The selected model is not available for this API key.');
+    PropertiesService.getScriptProperties().setProperty(MODEL_PROPERTY, normalizedModel);
+    return getSettings();
   }
 
   function saveSettings(apiKey, modelName) {
@@ -763,10 +863,24 @@ var GroqService = (function () {
     return AiPrompt.validateGeneratedSpec(extractResponseText(response), model);
   }
 
+  function discussForm(messages, modelName) {
+    var apiKey = resolveApiKey('');
+    var model = normalizeModelName(modelName || getSettings().model);
+    var response = requestJson('/chat/completions', {
+      method: 'post',
+      payload: {
+        model: model,
+        messages: [{ role: 'system', content: AiPrompt.buildDiscussionSystemPrompt() }].concat(messages),
+        temperature: 0.4
+      }
+    }, apiKey);
+    return extractResponseText(response);
+  }
+
   function isTextGenerationModel(model) {
     var id = String(model && model.id || '').toLowerCase();
     if (!id || model.active === false) return false;
-    return !/(whisper|speech|audio|tts|guard|safeguard)/.test(id);
+    return !/(whisper|speech|audio|tts|orpheus|guard|safeguard)/.test(id);
   }
 
   function toModelOption(model) {
@@ -836,15 +950,18 @@ var GroqService = (function () {
   function extractResponseText(response) {
     var choices = response && response.choices ? response.choices : [];
     var text = choices[0] && choices[0].message ? String(choices[0].message.content || '').trim() : '';
-    if (!text) throw new Error('AI_RESPONSE|Groq returned no JSON content.');
+    if (!text) throw new Error('AI_RESPONSE|Groq returned no content.');
     return text;
   }
 
   return {
     getSettings: getSettings,
     listModels: listModels,
+    saveApiKey: saveApiKey,
+    saveModel: saveModel,
     saveSettings: saveSettings,
     clearSettings: clearSettings,
+    discussForm: discussForm,
     generateSpec: generateSpec
   };
 })();
@@ -882,6 +999,27 @@ var AiService = (function () {
     };
   }
 
+  function saveApiKey(providerId, apiKey) {
+    var selectedProvider = normalizeProviderId(providerId);
+    var result = getProvider(selectedProvider).saveApiKey(apiKey);
+    return {
+      provider: selectedProvider,
+      hasApiKey: result.settings.hasApiKey,
+      model: result.settings.model,
+      models: result.models
+    };
+  }
+
+  function saveModel(providerId, modelName) {
+    var selectedProvider = normalizeProviderId(providerId);
+    var settings = getProvider(selectedProvider).saveModel(modelName);
+    return {
+      provider: selectedProvider,
+      hasApiKey: settings.hasApiKey,
+      model: settings.model
+    };
+  }
+
   function saveSettings(providerId, apiKey, modelName) {
     var selectedProvider = normalizeProviderId(providerId);
     var settings = getProvider(selectedProvider).saveSettings(apiKey, modelName);
@@ -907,6 +1045,30 @@ var AiService = (function () {
     return getProvider(selectedProvider).generateSpec(requirement, modelName);
   }
 
+  function discussForm(providerId, messages, modelName) {
+    var selectedProvider = normalizeProviderId(providerId);
+    return {
+      provider: selectedProvider,
+      model: modelName,
+      reply: getProvider(selectedProvider).discussForm(normalizeMessages(messages), modelName)
+    };
+  }
+
+  function normalizeMessages(messages) {
+    if (!Array.isArray(messages) || messages.length === 0) {
+      throw new Error('AI_CONFIG|請先輸入想討論的表單需求。');
+    }
+    var normalized = messages.slice(-24).map(function (message) {
+      var role = message && message.role === 'assistant' ? 'assistant' : 'user';
+      var content = String(message && message.content || '').trim();
+      if (!content || content.length > 6000) throw new Error('AI_CONFIG|單則對話內容需介於 1 到 6000 字。');
+      return { role: role, content: content };
+    });
+    var totalLength = normalized.reduce(function (total, message) { return total + message.content.length; }, 0);
+    if (totalLength > 40000) throw new Error('AI_CONFIG|對話內容過長，請重開討論或精簡需求。');
+    return normalized;
+  }
+
   function normalizeProviderId(providerId) {
     return String(providerId || DEFAULT_PROVIDER);
   }
@@ -924,9 +1086,9 @@ var AiService = (function () {
     var detail = separator === -1 ? '' : message.slice(separator + 1);
     if (code === 'AI_AUTH') return 'API Key \u7121\u6548\u3001\u672a\u555f\u7528\uff0c\u6216\u6c92\u6709\u6b0a\u9650\u3002\u8acb\u5230 provider console \u6aa2\u67e5 Key \u8a2d\u5b9a\u3002';
     if (code === 'AI_QUOTA') return 'API \u984d\u5ea6\u5df2\u7528\u5b8c\u6216\u8acb\u6c42\u904e\u65bc\u983b\u7e41\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002';
-    if (code === 'AI_MODEL') return '\u9078\u64c7\u7684\u6a21\u578b\u7121\u6548\u6216\u4e0d\u652f\u63f4 JSON \u5167\u5bb9\u7522\u751f\u3002';
+    if (code === 'AI_MODEL') return '\u9078\u64c7\u7684\u6a21\u578b\u7121\u6548\uff0c\u6216\u4e0d\u652f\u63f4\u76ee\u524d\u7684\u8868\u55ae\u8a2d\u8a08\u4efb\u52d9\u3002';
     if (code === 'AI_CONFIG') return detail || '\u8acb\u5148\u5b8c\u6210 AI \u8a2d\u5b9a\u3002';
-    if (code === 'AI_RESPONSE') return 'AI provider \u6c92\u6709\u56de\u50b3\u53ef\u7528\u7684 FormFlow JSON\uff0c\u8acb\u8abf\u6574\u9700\u6c42\u5f8c\u91cd\u8a66\u3002';
+    if (code === 'AI_RESPONSE') return 'AI provider \u6c92\u6709\u56de\u50b3\u53ef\u7528\u5167\u5bb9\uff0c\u8acb\u8abf\u6574\u8aaa\u660e\u5f8c\u91cd\u8a66\u3002';
     if (code === 'AI_PROVIDER') return '\u76ee\u524d\u53ea\u652f\u63f4 Google Gemini API \u8207 Groq API\u3002';
     return 'AI provider \u9023\u7dda\u5931\u6557\u3002' + (detail ? ' ' + detail : '');
   }
@@ -934,8 +1096,11 @@ var AiService = (function () {
   return {
     getSettings: getSettings,
     listModels: listModels,
+    saveApiKey: saveApiKey,
+    saveModel: saveModel,
     saveSettings: saveSettings,
     clearSettings: clearSettings,
+    discussForm: discussForm,
     generateSpec: generateSpec,
     toUserMessage: toUserMessage
   };

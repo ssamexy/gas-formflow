@@ -108,7 +108,7 @@ try {
 } catch (error) {
   fail(`dist/Code.gs has JavaScript syntax error: ${error.message}`);
 }
-for (const fn of ['doGet', 'setup', 'apiValidateSpec', 'apiPreviewSpec', 'apiGetAiSettings', 'apiListAiModels', 'apiSaveAiSettings', 'apiClearAiSettings', 'apiGenerateSpecWithAi', 'apiCreateFormFlow']) {
+for (const fn of ['doGet', 'setup', 'apiValidateSpec', 'apiPreviewSpec', 'apiGetAiSettings', 'apiListAiModels', 'apiSaveAiKey', 'apiSaveAiModel', 'apiSaveAiSettings', 'apiDiscussFormWithAi', 'apiGenerateSpecFromOutline', 'apiClearAiSettings', 'apiGenerateSpecWithAi', 'apiCreateFormFlow']) {
   if (!distCode.includes(`function ${fn}`)) fail(`dist/Code.gs missing ${fn}`);
 }
 for (const fn of publicFunctionBlocklist) {
@@ -128,9 +128,12 @@ if (distCode.includes('generativelanguage.googleapis.com/v1beta?key=')) fail('Ge
 if (!distCode.includes('safeCellText')) fail('dist/Code.gs missing spreadsheet formula-injection guard');
 if (distCode.includes('DriveApp.')) fail('dist/Code.gs should not require broad DriveApp access');
 const distHtml = fs.existsSync(path.join(root, 'dist/Index.html')) ? fs.readFileSync(path.join(root, 'dist/Index.html'), 'utf8') : '';
-for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e', 'qrcodegen.QrCode.encodeText', 'white-space: pre-wrap', 'detectAiModels', 'generateJsonWithAi']) {
+for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e', 'qrcodegen.QrCode.encodeText', 'white-space: pre-wrap', 'detectAiModels', 'saveAiKey', 'sendAiChat', 'approveOutlineAndGenerateJson', 'ai-chat-log', 'ai-approve-outline']) {
   if (!distHtml.includes(helper)) fail(`dist/Index.html missing ${helper}`);
 }
+if (!distHtml.includes('type="password"') || !distHtml.includes('儲存後此欄位會清空')) fail('AI key UI must be masked and explain post-save clearing');
+if (!distHtml.includes('content.textContent = message.content')) fail('AI chat messages must render with textContent');
+if (!distHtml.includes("assistantMessage.content.includes('目前表單雛型')")) fail('Outline approval must stay disabled until the AI explicitly returns the labeled outline');
 if (distHtml.includes("<?!= include('QrCodeLibrary') ?>")) fail('dist/Index.html must inline the QR library');
 if (distHtml.includes('renderQrPlaceholder') || distHtml.includes('QR placeholder')) fail('dist/Index.html must not contain the QR placeholder');
 verifyInlineScripts(distHtml);
@@ -307,6 +310,7 @@ function verifyAiServices() {
   const properties = {};
   const propertyStore = {
     getProperty(key) { return properties[key] || null; },
+    setProperty(key, value) { properties[key] = value; },
     setProperties(values) { Object.assign(properties, values); },
     deleteProperty(key) { delete properties[key]; }
   };
@@ -323,6 +327,10 @@ function verifyAiServices() {
       requests.push({ url, options });
       if (authFailure) return mockHttpResponse(403, { error: { message: `Denied ${TEST_AI_KEY}` } });
       if (url.includes(':generateContent')) {
+        const payload = JSON.parse(options.payload);
+        if (!payload.generationConfig?.responseMimeType) {
+          return mockHttpResponse(200, { candidates: [{ content: { parts: [{ text: '目前表單雛型\n1. 姓名\n2. Email' }] } }] });
+        }
         return mockHttpResponse(200, { candidates: [{ content: { parts: [{ text: JSON.stringify(generatedSpec) }] } }] });
       }
       return mockHttpResponse(200, {
@@ -339,11 +347,18 @@ function verifyAiServices() {
   const modelsResult = services.AiService.listModels('google-gemini', TEST_AI_KEY);
   if (modelsResult.models.length !== 1 || modelsResult.models[0].name !== 'models/gemini-test-flash') fail('AI model list must include only generateContent models');
   if (requests[0].url.includes(TEST_AI_KEY) || requests[0].options.headers['x-goog-api-key'] !== TEST_AI_KEY) fail('AI key must be sent only in the x-goog-api-key header');
-  const saved = services.AiService.saveSettings('google-gemini', TEST_AI_KEY, 'models/gemini-test-flash');
-  if (!saved.hasApiKey || JSON.stringify(saved).includes(TEST_AI_KEY)) fail('AI settings response must confirm but never reveal the API key');
+  const keySaved = services.AiService.saveApiKey('google-gemini', TEST_AI_KEY);
+  if (!keySaved.hasApiKey || JSON.stringify(keySaved).includes(TEST_AI_KEY)) fail('AI key response must confirm but never reveal the API key');
+  if (keySaved.model) fail('Saving a Gemini key must clear the old model so the user chooses from the refreshed list');
+  const saved = services.AiService.saveModel('google-gemini', 'models/gemini-test-flash');
+  if (saved.model !== 'models/gemini-test-flash') fail('Gemini model must save separately from the API key');
+  const discussion = services.AiService.discussForm('google-gemini', [{ role: 'user', content: '請和我討論報名表' }], 'models/gemini-test-flash');
+  if (!discussion.reply.includes('目前表單雛型')) fail('Gemini discussion must return a plain-language outline');
+  const discussionRequest = requests.find((request) => request.url.includes(':generateContent') && !JSON.parse(request.options.payload).generationConfig?.responseMimeType);
+  if (!discussionRequest || JSON.parse(discussionRequest.options.payload).systemInstruction.parts[0].text.includes('Return JSON only')) fail('Gemini discussion must use the non-JSON discussion prompt');
   const generated = services.AiService.generateSpec('google-gemini', 'Create a registration form', 'models/gemini-test-flash');
   if (generated.ok === false || JSON.parse(generated.jsonText).title !== generatedSpec.title) fail('AI generation must return validated FormFlow JSON');
-  const generationRequest = requests.find((request) => request.url.includes(':generateContent'));
+  const generationRequest = requests.find((request) => request.url.includes(':generateContent') && JSON.parse(request.options.payload).generationConfig?.responseMimeType);
   const generationPayload = generationRequest ? JSON.parse(generationRequest.options.payload) : {};
   if (generationPayload.generationConfig?.responseMimeType !== 'application/json') fail('AI generation must request JSON output');
   authFailure = true;
@@ -369,6 +384,7 @@ function verifyGroqServices() {
   const properties = {};
   const propertyStore = {
     getProperty(key) { return properties[key] || null; },
+    setProperty(key, value) { properties[key] = value; },
     setProperties(values) { Object.assign(properties, values); },
     deleteProperty(key) { delete properties[key]; }
   };
@@ -384,11 +400,16 @@ function verifyGroqServices() {
       requests.push({ url, options });
       if (authFailure) return mockHttpResponse(401, { error: { message: `Denied ${TEST_GROQ_KEY}` } });
       if (url.endsWith('/chat/completions')) {
+        const payload = JSON.parse(options.payload);
+        if (!payload.response_format) {
+          return mockHttpResponse(200, { choices: [{ message: { content: '目前表單雛型\n1. Email' } }] });
+        }
         return mockHttpResponse(200, { choices: [{ message: { content: JSON.stringify(generatedSpec) } }] });
       }
       return mockHttpResponse(200, {
         data: [
           { id: 'llama-test-chat', active: true, owned_by: 'Meta', context_window: 8192, max_completion_tokens: 2048 },
+          { id: 'canopylabs/orpheus-v1-english', active: true, owned_by: 'Canopy Labs', context_window: 4000 },
           { id: 'whisper-test-audio', active: true, owned_by: 'OpenAI', context_window: 448 },
           { id: 'safeguard-test-model', active: true, owned_by: 'OpenAI', context_window: 8192 }
         ]
@@ -400,13 +421,20 @@ function verifyGroqServices() {
   const modelsResult = services.AiService.listModels('groq', TEST_GROQ_KEY);
   if (modelsResult.models.length !== 1 || modelsResult.models[0].name !== 'llama-test-chat') fail('Groq model list must exclude non-text models');
   if (requests[0].url.includes(TEST_GROQ_KEY) || requests[0].options.headers.Authorization !== `Bearer ${TEST_GROQ_KEY}`) fail('Groq key must be sent only in the Authorization header');
-  const saved = services.AiService.saveSettings('groq', TEST_GROQ_KEY, 'llama-test-chat');
-  if (!saved.hasApiKey || JSON.stringify(saved).includes(TEST_GROQ_KEY)) fail('Groq settings response must never reveal the API key');
+  const keySaved = services.AiService.saveApiKey('groq', TEST_GROQ_KEY);
+  if (!keySaved.hasApiKey || JSON.stringify(keySaved).includes(TEST_GROQ_KEY)) fail('Groq key response must never reveal the API key');
+  if (keySaved.model) fail('Saving a Groq key must clear the old model so the user chooses from the refreshed list');
+  const saved = services.AiService.saveModel('groq', 'llama-test-chat');
+  if (saved.model !== 'llama-test-chat') fail('Groq model must save separately from the API key');
+  const discussion = services.AiService.discussForm('groq', [{ role: 'user', content: '請和我討論回饋表' }], 'llama-test-chat');
+  if (!discussion.reply.includes('目前表單雛型')) fail('Groq discussion must return a plain-language outline');
   const generated = services.AiService.generateSpec('groq', 'Create a feedback form', 'llama-test-chat');
   if (generated.ok === false || JSON.parse(generated.jsonText).title !== generatedSpec.title) fail('Groq generation must return validated FormFlow JSON');
-  const generationRequest = requests.find((request) => request.url.endsWith('/chat/completions'));
+  const generationRequest = requests.find((request) => request.url.endsWith('/chat/completions') && JSON.parse(request.options.payload).response_format);
   const payload = generationRequest ? JSON.parse(generationRequest.options.payload) : {};
   if (payload.response_format?.type !== 'json_object') fail('Groq generation must request JSON Object Mode');
+  const discussionRequest = requests.find((request) => request.url.endsWith('/chat/completions') && !JSON.parse(request.options.payload).response_format);
+  if (!discussionRequest || JSON.parse(discussionRequest.options.payload).messages[0].content.includes('Return JSON only')) fail('Groq discussion must use the non-JSON discussion prompt');
   authFailure = true;
   try {
     services.AiService.listModels('groq', TEST_GROQ_KEY);

@@ -38,7 +38,7 @@ function doGet(e) {
   }
   if (e && e.parameter && e.parameter.mode === 'health') {
     return ContentService
-      .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.2.0' }))
+      .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.3.0' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
   return HtmlService.createTemplateFromFile('Index').evaluate()
@@ -103,6 +103,18 @@ function apiListAiModels(providerId, apiKey) {
   });
 }
 
+function apiSaveAiKey(providerId, apiKey) {
+  return runPrivateAiOperation_(function () {
+    return AiService.saveApiKey(providerId, apiKey);
+  });
+}
+
+function apiSaveAiModel(providerId, modelName) {
+  return runPrivateAiOperation_(function () {
+    return AiService.saveModel(providerId, modelName);
+  });
+}
+
 function apiSaveAiSettings(providerId, apiKey, modelName) {
   return runPrivateAiOperation_(function () {
     return AiService.saveSettings(providerId, apiKey, modelName);
@@ -112,6 +124,18 @@ function apiSaveAiSettings(providerId, apiKey, modelName) {
 function apiClearAiSettings(providerId) {
   return runPrivateAiOperation_(function () {
     return AiService.clearSettings(providerId);
+  });
+}
+
+function apiDiscussFormWithAi(providerId, messages, modelName) {
+  return runPrivateAiOperation_(function () {
+    return AiService.discussForm(providerId, messages, modelName);
+  });
+}
+
+function apiGenerateSpecFromOutline(providerId, outline, modelName) {
+  return runPrivateAiOperation_(function () {
+    return AiService.generateSpec(providerId, outline, modelName);
   });
 }
 
@@ -228,7 +252,7 @@ function apiSelfTest() {
   return {
     ok: allPassed,
     app: 'GAS FormFlow',
-    version: '0.2.0',
+    version: '0.3.0',
     startedAt: startedAt,
     finishedAt: new Date().toISOString(),
     sideEffects: 'none',

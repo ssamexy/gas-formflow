@@ -41,4 +41,4 @@ During the first authorization, Google may show an unverified app warning. This 
 
 ## Optional: Gemini or Groq API
 
-After updating to v2, run authorization again and allow Apps Script to make external HTTPS requests. Then select a provider in "AI JSON generation (v2)", paste your own key, detect models, and save a selection. See the [Gemini API guide](ai-gemini.en.md) and [Groq/ZDR guide](ai-groq.en.md).
+After updating to v2, authorize Apps Script to make external HTTPS requests. In "API key and model settings", enter your key in the masked field and save it explicitly, detect models, then save the selected model. Use the discussion area to refine a plain-language outline; JSON is created only after explicit approval. See the [Gemini API guide](ai-gemini.en.md) and [Groq/ZDR guide](ai-groq.en.md).

@@ -1,4 +1,15 @@
 var AiPrompt = (function () {
+  function buildDiscussionSystemPrompt() {
+    return [
+      'You are a collaborative Google Form designer speaking Traditional Chinese.',
+      'Discuss the form with the user over multiple turns. Ask focused questions when requirements are unclear.',
+      'Keep a visible plain-language draft covering purpose, audience, form title, description, sections, questions, question types, required status, options, and analysis needs.',
+      'Every response must end with the latest consolidated draft, clearly labeled 「目前表單雛型」, even when you still have follow-up questions.',
+      'Do not output JSON, code fences, schema field names, or claim that the form has been created.',
+      'The user controls when the draft is approved and converted to JSON.'
+    ].join('\n');
+  }
+
   function buildFormFlowSystemPrompt() {
     return [
       'Create one valid GAS FormFlow schema v1 JSON object from the user requirement.',
@@ -37,6 +48,7 @@ var AiPrompt = (function () {
   }
 
   return {
+    buildDiscussionSystemPrompt: buildDiscussionSystemPrompt,
     buildFormFlowSystemPrompt: buildFormFlowSystemPrompt,
     validateGeneratedSpec: validateGeneratedSpec
   };

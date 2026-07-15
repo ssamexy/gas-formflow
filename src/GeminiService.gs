@@ -17,12 +17,30 @@ var GeminiService = (function () {
     var data = requestJson('/models?pageSize=1000', { method: 'get' }, resolvedKey);
     return (data.models || [])
       .filter(function (model) {
-        return (model.supportedGenerationMethods || []).indexOf('generateContent') !== -1;
+        return isFormDesignModel(model);
       })
       .map(toModelOption)
       .sort(function (a, b) {
         return a.label.localeCompare(b.label);
       });
+  }
+
+  function saveApiKey(apiKey) {
+    var resolvedKey = resolveApiKey(apiKey);
+    var models = listModels(resolvedKey);
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(API_KEY_PROPERTY, resolvedKey);
+    props.deleteProperty(MODEL_PROPERTY);
+    return { settings: getSettings(), models: models };
+  }
+
+  function saveModel(modelName) {
+    var normalizedModel = normalizeModelName(modelName);
+    var models = listModels('');
+    var isAvailable = models.some(function (model) { return model.name === normalizedModel; });
+    if (!isAvailable) throw new Error('AI_MODEL|The selected model is not available for this API key.');
+    PropertiesService.getScriptProperties().setProperty(MODEL_PROPERTY, normalizedModel);
+    return getSettings();
   }
 
   function saveSettings(apiKey, modelName) {
@@ -55,6 +73,31 @@ var GeminiService = (function () {
       payload: buildGenerationRequest(prompt)
     }, apiKey);
     return AiPrompt.validateGeneratedSpec(extractResponseText(response), model);
+  }
+
+  function discussForm(messages, modelName) {
+    var apiKey = resolveApiKey('');
+    var model = normalizeModelName(modelName || getSettings().model);
+    var response = requestJson('/' + model + ':generateContent', {
+      method: 'post',
+      payload: {
+        systemInstruction: { parts: [{ text: AiPrompt.buildDiscussionSystemPrompt() }] },
+        contents: messages.map(function (message) {
+          return {
+            role: message.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: message.content }]
+          };
+        }),
+        generationConfig: { temperature: 0.4, maxOutputTokens: 4096 }
+      }
+    }, apiKey);
+    return extractResponseText(response);
+  }
+
+  function isFormDesignModel(model) {
+    var name = String(model && model.name || '').toLowerCase();
+    if ((model.supportedGenerationMethods || []).indexOf('generateContent') === -1) return false;
+    return !/(tts|image|banana|lyria|robotics|computer-use|deep-research|antigravity|omni)/.test(name);
   }
 
   function toModelOption(model) {
@@ -141,15 +184,18 @@ var GeminiService = (function () {
     var candidates = response && response.candidates ? response.candidates : [];
     var parts = candidates[0] && candidates[0].content ? candidates[0].content.parts || [] : [];
     var text = parts.map(function (part) { return part.text || ''; }).join('').trim();
-    if (!text) throw new Error('AI_RESPONSE|Gemini returned no JSON content.');
+    if (!text) throw new Error('AI_RESPONSE|Gemini returned no content.');
     return text;
   }
 
   return {
     getSettings: getSettings,
     listModels: listModels,
+    saveApiKey: saveApiKey,
+    saveModel: saveModel,
     saveSettings: saveSettings,
     clearSettings: clearSettings,
+    discussForm: discussForm,
     generateSpec: generateSpec
   };
 })();
