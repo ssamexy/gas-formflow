@@ -108,7 +108,8 @@ tools/     本地打包與驗證腳本
 
 ## v1 功能
 
-- JSON 輸入、範例載入、驗證與預覽
+- JSON 輸入、範例載入、驗證與接近 Google Forms 填寫畫面的預覽
+- 內建範例以紫色標示來源，並可一鍵複製給其他 AI 當 JSON 格式模板
 - 建立 Google Form
 - 建立 Google Sheet 並設定 Form response destination
 - 建立 `Clean_Data`、`Question_Meta`、`Summary`、`Announcement`、`Generator_Log` 分頁

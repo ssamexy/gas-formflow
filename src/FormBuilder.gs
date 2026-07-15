@@ -13,7 +13,11 @@ var FormBuilder = (function () {
           required: !!item.required,
           options: item.options || [],
           rows: item.rows || [],
-          columns: item.columns || []
+          columns: item.columns || [],
+          lowerBound: item.lowerBound !== undefined ? item.lowerBound : 1,
+          upperBound: item.upperBound !== undefined ? item.upperBound : 5,
+          lowerLabel: item.lowerLabel || '',
+          upperLabel: item.upperLabel || ''
         };
       })
     };
@@ -72,7 +76,10 @@ var FormBuilder = (function () {
       case 'scale':
         created = form.addScaleItem();
         setCommon(created, item);
-        created.setBounds(item.lowerBound || 1, item.upperBound || 5);
+        created.setBounds(
+          item.lowerBound !== undefined ? item.lowerBound : 1,
+          item.upperBound !== undefined ? item.upperBound : 5
+        );
         if (item.lowerLabel || item.upperLabel) created.setLabels(item.lowerLabel || '', item.upperLabel || '');
         break;
       case 'sectionHeader':

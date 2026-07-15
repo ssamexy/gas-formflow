@@ -128,9 +128,12 @@ if (distCode.includes('generativelanguage.googleapis.com/v1beta?key=')) fail('Ge
 if (!distCode.includes('safeCellText')) fail('dist/Code.gs missing spreadsheet formula-injection guard');
 if (distCode.includes('DriveApp.')) fail('dist/Code.gs should not require broad DriveApp access');
 const distHtml = fs.existsSync(path.join(root, 'dist/Index.html')) ? fs.readFileSync(path.join(root, 'dist/Index.html'), 'utf8') : '';
-for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e', 'qrcodegen.QrCode.encodeText', 'white-space: pre-wrap', 'detectAiModels', 'saveAiKey', 'sendAiChat', 'handleChatKeydown', 'updateChatSendState', 'showChatThinking', 'openConfirmation', 'approveOutlineAndGenerateJson', 'ai-settings-dialog', 'setup-empty-state', 'starter-prompts', 'jsonPanel', 'ai-chat-log', 'chat-composer', 'ai-approve-outline']) {
+for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e', 'qrcodegen.QrCode.encodeText', 'white-space: pre-wrap', 'detectAiModels', 'saveAiKey', 'sendAiChat', 'handleChatKeydown', 'updateChatSendState', 'showChatThinking', 'openConfirmation', 'approveOutlineAndGenerateJson', 'ai-settings-dialog', 'setup-empty-state', 'starter-prompts', 'jsonPanel', 'ai-chat-log', 'chat-composer', 'ai-approve-outline', 'copySelectedExample', 'writeClipboardText', 'copy-example-button', 'example-template-note', 'google-form-preview', 'renderGoogleFormControl']) {
   if (!distHtml.includes(helper)) fail(`dist/Index.html missing ${helper}`);
 }
+if (!distHtml.includes('textarea.example-json') || !distHtml.includes("setJsonSource('generated')") || !distHtml.includes("input.addEventListener('input', () => setJsonSource('custom'))")) fail('JSON editor must distinguish examples and clear the example style for generated or user-edited content');
+if (!distHtml.includes('完整範例 JSON 已複製') || !distHtml.includes("document.execCommand('copy')")) fail('Example JSON copy must provide feedback and an iframe-compatible fallback');
+if (!distCode.includes('lowerBound: item.lowerBound !== undefined ? item.lowerBound : 1') || !distHtml.includes('google-form-scale')) fail('Google Forms preview must preserve scale bounds, including zero, and labels');
 if (!distHtml.includes('type="password"') || !distHtml.includes('儲存後此欄位會立即清空')) fail('AI key UI must be masked and explain post-save clearing');
 if (!distHtml.includes('content.textContent = message.content')) fail('AI chat messages must render with textContent');
 if (!distHtml.includes("assistantMessage.content.includes('目前表單雛型')")) fail('Outline approval must stay disabled until the AI explicitly returns the labeled outline');
@@ -279,7 +282,9 @@ function verifyFormDescriptions() {
   const item = {
     setTitle(value) { itemState.title = value; },
     setHelpText(value) { itemState.helpText = value; },
-    setRequired(value) { itemState.required = value; }
+    setRequired(value) { itemState.required = value; },
+    setBounds(lower, upper) { itemState.bounds = [lower, upper]; },
+    setLabels(lower, upper) { itemState.labels = [lower, upper]; }
   };
   const formState = {};
   const form = {
@@ -287,6 +292,7 @@ function verifyFormDescriptions() {
     getDescription() { return formState.description; },
     setConfirmationMessage() {},
     addTextItem() { return item; },
+    addScaleItem() { return item; },
     getPublishedUrl() { return 'https://example.com/form'; },
     getEditUrl() { return 'https://example.com/edit'; }
   };
@@ -301,6 +307,13 @@ function verifyFormDescriptions() {
   if (result.description !== spec.description || formState.description !== spec.description) fail('form description was not written and read back');
   if (preview.description !== spec.description) fail('form description missing from preview');
   if (preview.items[0].helpText !== spec.items[0].description || itemState.helpText !== spec.items[0].description) fail('item description alias was not applied as help text');
+  const scaleSpec = {
+    title: 'Scale bounds test',
+    items: [{ key: 'score', type: 'scale', title: 'Score', lowerBound: 0, upperBound: 5, lowerLabel: 'Low', upperLabel: 'High' }]
+  };
+  const scalePreview = FormBuilder.preview(scaleSpec);
+  FormBuilder.create(scaleSpec);
+  if (scalePreview.items[0].lowerBound !== 0 || itemState.bounds[0] !== 0) fail('scale lower bound zero must be preserved in preview and form creation');
 }
 
 function verifyAiServices() {
