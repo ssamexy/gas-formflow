@@ -8,70 +8,84 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f7f8f5;
+      --bg: #f3f6f5;
       --panel: #ffffff;
-      --ink: #17201b;
-      --muted: #647067;
-      --line: #dce1da;
-      --accent: #176b57;
-      --accent-strong: #0f4f40;
+      --ink: #15211d;
+      --muted: #66756f;
+      --line: #dce5e1;
+      --line-strong: #c8d6d0;
+      --accent: #0f766e;
+      --accent-strong: #0b5d57;
+      --accent-soft: #e8f5f2;
       --danger: #b42318;
       --ok: #116b35;
-      --shadow: 0 12px 28px rgba(23, 32, 27, .08);
+      --shadow: 0 18px 50px rgba(19, 43, 35, .08);
+      --shadow-soft: 0 8px 24px rgba(19, 43, 35, .07);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at 8% 0%, rgba(15, 118, 110, .08), transparent 28rem),
+        var(--bg);
       color: var(--ink);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.5;
     }
     header {
-      padding: 20px 16px 12px;
-      border-bottom: 1px solid var(--line);
-      background: #fff;
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid rgba(220, 229, 225, .8);
+      background: rgba(255, 255, 255, .88);
+      backdrop-filter: blur(14px);
       position: sticky;
       top: 0;
       z-index: 2;
     }
     .wrap { max-width: 1280px; margin: 0 auto; }
-    h1 { margin: 0; font-size: clamp(24px, 5vw, 38px); letter-spacing: 0; }
+    h1 { margin: 0; font-size: clamp(24px, 5vw, 36px); letter-spacing: -.035em; }
     .tagline { margin: 4px 0 0; color: var(--muted); }
-    main { padding: 18px 16px 34px; }
-    .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); gap: 16px; align-items: start; }
+    main { padding: 24px 16px 48px; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); gap: 20px; align-items: start; }
     .panel {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 18px;
       box-shadow: var(--shadow);
-      padding: 14px;
+      padding: 18px;
     }
     .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
     button, select, input {
       min-height: 40px;
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: 10px;
       padding: 0 12px;
       background: #fff;
       color: var(--ink);
       font: inherit;
     }
-    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-    button.primary:hover { background: var(--accent-strong); }
-    button:disabled { opacity: .55; cursor: wait; }
+    button { cursor: pointer; font-weight: 650; transition: background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+    button:hover:not(:disabled) { border-color: var(--line-strong); background: #f8faf9; }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(15, 118, 110, .18); }
+    button.primary:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
+    button:disabled { opacity: .48; cursor: not-allowed; }
+    button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 3px solid rgba(15, 118, 110, .2);
+      outline-offset: 2px;
+      border-color: var(--accent);
+    }
     textarea {
       width: 100%;
       min-height: 42vh;
       resize: vertical;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 12px;
       padding: 12px;
       font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
       font-size: 13px;
       line-height: 1.45;
     }
-    h2 { margin: 0 0 10px; font-size: 18px; }
+    h2 { margin: 0 0 12px; font-size: 19px; letter-spacing: -.015em; }
     h3 { margin: 16px 0 8px; font-size: 15px; }
     .status { margin: 10px 0; padding: 10px; border-radius: 6px; background: #eef4f1; color: var(--accent-strong); }
     .status.error { background: #fff1f0; color: var(--danger); }
@@ -95,9 +109,9 @@
     .ai-panel {
       margin: 0 0 12px;
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      background: #fbfcfa;
+      border-radius: 14px;
+      padding: 14px;
+      background: #fbfcfc;
     }
     .ai-panel summary { cursor: pointer; font-weight: 700; }
     .ai-panel .hint { margin: 8px 0; color: var(--muted); font-size: 13px; }
@@ -106,22 +120,108 @@
     .field input, .field select { width: 100%; }
     .field.full { grid-column: 1 / -1; }
     .key-note { color: var(--muted); font-size: 12px; }
+    .chat-panel { padding: 0; overflow: hidden; background: #fff; }
+    .chat-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #fff, #fbfdfc);
+    }
+    .chat-header h3 { margin: 3px 0 2px; font-size: 17px; }
+    .chat-header .hint { margin: 0; }
+    .step-label { color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .ghost-button { min-height: 36px; flex: 0 0 auto; color: var(--muted); background: transparent; }
+    .chat-shell { background: #f8faf9; }
     .chat-log {
       display: grid;
-      gap: 10px;
-      max-height: 520px;
+      gap: 18px;
+      min-height: 350px;
+      max-height: 560px;
       overflow-y: auto;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      background: #fff;
+      padding: 22px 18px 26px;
+      overscroll-behavior: contain;
+      scroll-behavior: smooth;
     }
-    .chat-message { max-width: 92%; border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .chat-message.user { justify-self: end; background: #e8f4ef; }
-    .chat-message.assistant { justify-self: start; background: #f1f3f0; }
-    .chat-message small { display: block; margin-bottom: 4px; color: var(--muted); font-weight: 700; }
-    textarea.chat-input { min-height: 110px; margin-top: 10px; font-family: inherit; }
-    .approval-bar { margin-top: 10px; padding: 10px; border: 1px solid #b9d8cb; border-radius: 8px; background: #f0f8f4; }
+    .chat-message { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; width: min(100%, 760px); }
+    .chat-message.user { grid-template-columns: minmax(0, 1fr) 34px; justify-self: end; }
+    .chat-avatar {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: var(--shadow-soft);
+    }
+    .chat-message.user .chat-avatar { grid-column: 2; background: #dce9e4; color: var(--accent-strong); box-shadow: none; }
+    .chat-message.user .chat-content { grid-column: 1; grid-row: 1; justify-self: end; background: var(--accent); color: #fff; border-color: var(--accent); }
+    .chat-content {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 5px 14px 14px 14px;
+      padding: 11px 13px;
+      background: #fff;
+      box-shadow: 0 4px 14px rgba(19, 43, 35, .05);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .chat-message.user .chat-content { border-radius: 14px 5px 14px 14px; }
+    .chat-role { display: block; margin-bottom: 4px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+    .chat-message.user .chat-role { color: rgba(255, 255, 255, .74); text-align: right; }
+    .typing-dots { display: inline-flex; align-items: center; gap: 4px; min-height: 20px; }
+    .typing-dots i { width: 6px; height: 6px; border-radius: 50%; background: #8aa199; animation: typing 1.2s infinite ease-in-out; }
+    .typing-dots i:nth-child(2) { animation-delay: .15s; }
+    .typing-dots i:nth-child(3) { animation-delay: .3s; }
+    @keyframes typing { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-4px); opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+    }
+    .chat-composer-wrap { position: relative; padding: 0 16px 16px; background: linear-gradient(180deg, rgba(248, 250, 249, 0), #f8faf9 22%); }
+    .chat-composer {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: 16px;
+      padding: 10px 10px 8px 14px;
+      background: #fff;
+      box-shadow: 0 10px 28px rgba(19, 43, 35, .1);
+    }
+    textarea.chat-input {
+      min-height: 28px;
+      max-height: 180px;
+      margin: 0;
+      padding: 4px 0;
+      resize: none;
+      border: 0;
+      border-radius: 0;
+      outline: 0;
+      font-family: inherit;
+      font-size: 15px;
+      line-height: 1.5;
+      overflow-y: auto;
+    }
+    textarea.chat-input:focus-visible { outline: 0; border-color: transparent; }
+    .send-button {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      min-height: 40px;
+      padding: 0;
+      border-radius: 12px;
+    }
+    .send-button svg { width: 18px; height: 18px; }
+    .composer-hint { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+    .composer-hint kbd { padding: 1px 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: #f8faf9; font: inherit; }
+    .approval-bar { margin: 0; padding: 14px 18px 18px; border-top: 1px solid var(--line); background: #f1f8f6; }
+    .approval-bar p { margin: 4px 0 10px; }
     .json-heading { margin-top: 18px; }
     .json-hint { margin: -4px 0 10px; color: var(--muted); font-size: 13px; }
     .preview-panel { position: sticky; top: 104px; max-height: calc(100vh - 122px); overflow: auto; }
@@ -143,6 +243,12 @@
       .field.full { grid-column: auto; }
       .preview-panel { position: static; max-height: none; }
       header { position: static; }
+      .panel { padding: 14px; border-radius: 14px; }
+      .chat-panel { padding: 0; }
+      .chat-header { padding: 14px; }
+      .chat-log { min-height: 320px; padding: 18px 12px 22px; }
+      .chat-composer-wrap { padding: 0 10px 12px; }
+      .composer-hint { display: none; }
     }
   </style>
 </head>
@@ -188,14 +294,26 @@
           <small id="aiModelInfo" class="model-info"></small>
         </details>
 
-        <section class="ai-panel" aria-labelledby="discussionHeading">
-          <h3 id="discussionHeading">1. 與 AI 討論白話文表單雛型</h3>
-          <p class="hint">AI 只會提出問題、建議與整理雛型，不會在這個階段產生或覆寫 JSON。對話只保留在目前瀏覽器分頁。</p>
-          <div id="aiChatLog" data-testid="ai-chat-log" class="chat-log" aria-live="polite"></div>
-          <textarea id="aiChatInput" data-testid="ai-chat-input" class="chat-input" placeholder="例如：我要辦一場社區餐會，但還不確定應該問哪些資料，請先跟我討論。"></textarea>
-          <div class="toolbar">
-            <button id="aiChatSendBtn" data-testid="ai-chat-send" class="primary">送出並繼續討論</button>
-            <button id="aiChatResetBtn" data-testid="ai-chat-reset">重新討論</button>
+        <section class="ai-panel chat-panel" aria-labelledby="discussionHeading">
+          <div class="chat-header">
+            <div>
+              <span class="step-label">Step 1 · Discuss</span>
+              <h3 id="discussionHeading">與 AI 討論白話文表單雛型</h3>
+              <p class="hint">先討論、再核准；此階段不會產生或覆寫 JSON。</p>
+            </div>
+            <button id="aiChatResetBtn" data-testid="ai-chat-reset" class="ghost-button" title="清除目前分頁中的對話">重新討論</button>
+          </div>
+          <div class="chat-shell">
+            <div id="aiChatLog" data-testid="ai-chat-log" class="chat-log" aria-live="polite" aria-label="AI 表單設計對話"></div>
+            <div class="chat-composer-wrap">
+              <div class="chat-composer">
+                <textarea id="aiChatInput" data-testid="ai-chat-input" class="chat-input" rows="1" maxlength="6000" aria-label="輸入要和 AI 討論的內容" placeholder="描述表單用途、填寫對象，或回覆 AI 的問題…"></textarea>
+                <button id="aiChatSendBtn" data-testid="ai-chat-send" class="primary send-button" aria-label="送出訊息" title="送出訊息（Enter）">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m0 0-6 6m6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div class="composer-hint"><kbd>Enter</kbd> 送出 · <kbd>Shift</kbd> + <kbd>Enter</kbd> 換行</div>
+              </div>
+            </div>
           </div>
           <div class="approval-bar">
             <strong>只有你同意後才會轉成 JSON</strong>
@@ -1142,6 +1260,7 @@ var qrcodegen;
     const aiModelInfoEl = document.getElementById('aiModelInfo');
     const aiChatLogEl = document.getElementById('aiChatLog');
     const aiChatInputEl = document.getElementById('aiChatInput');
+    const aiChatSendBtn = document.getElementById('aiChatSendBtn');
     const aiApproveBtn = document.getElementById('aiApproveBtn');
     const buttons = [...document.querySelectorAll('button, select, input')];
     let detectedAiModels = [];
@@ -1149,6 +1268,7 @@ var qrcodegen;
     let savedAiModel = '';
     let aiConversation = [];
     let currentOutline = '';
+    let isBusy = false;
 
     document.getElementById('exampleSelect').addEventListener('change', (event) => {
       const spec = examples[event.target.value];
@@ -1165,8 +1285,10 @@ var qrcodegen;
     document.getElementById('aiDetectBtn').addEventListener('click', detectAiModels);
     document.getElementById('aiSaveModelBtn').addEventListener('click', saveAiModel);
     document.getElementById('aiClearBtn').addEventListener('click', clearAiSettings);
-    document.getElementById('aiChatSendBtn').addEventListener('click', sendAiChat);
+    aiChatSendBtn.addEventListener('click', sendAiChat);
     document.getElementById('aiChatResetBtn').addEventListener('click', () => resetAiDiscussion(true));
+    aiChatInputEl.addEventListener('keydown', handleChatKeydown);
+    aiChatInputEl.addEventListener('input', resizeChatInput);
     aiApproveBtn.addEventListener('click', approveOutlineAndGenerateJson);
     aiProviderEl.addEventListener('change', switchAiProvider);
     aiModelEl.addEventListener('change', renderAiModelInfo);
@@ -1218,6 +1340,7 @@ var qrcodegen;
         savedAiModel = res.model || '';
         if (savedAiModel) populateAiModels([{ name: savedAiModel, label: savedAiModel.replace(/^models\//, ''), description: '', inputTokenLimit: 0, outputTokenLimit: 0 }], savedAiModel);
         setAiStatus(hasStoredAiKey ? `${getProviderLabel()} 已儲存 API Key，不會回填明碼。` : `${getProviderLabel()} 尚未儲存 API Key。請先在密碼欄輸入並按「安全儲存 Key」。`, false);
+        updateChatSendState();
       });
     }
 
@@ -1239,6 +1362,7 @@ var qrcodegen;
         detectedAiModels = res.models || [];
         populateAiModels(detectedAiModels, res.model || savedAiModel);
         setAiStatus(`Key 已安全儲存並清空輸入欄；偵測到 ${detectedAiModels.length} 個適合表單設計的模型。`, false);
+        updateChatSendState();
       });
     }
 
@@ -1305,6 +1429,7 @@ var qrcodegen;
         }
         savedAiModel = res.model || aiModelEl.value;
         setAiStatus(`模型已儲存：${savedAiModel.replace(/^models\//, '')}。現在可以開始與 AI 討論。`, false);
+        updateChatSendState();
       });
     }
 
@@ -1343,10 +1468,13 @@ var qrcodegen;
       aiConversation.push(userMessage);
       appendChatMessage(userMessage);
       aiChatInputEl.value = '';
+      resizeChatInput();
+      showChatThinking();
       setAiStatus(`${getProviderLabel()} 正在整理需求與更新白話文雛型...`, false);
       run('apiDiscussFormWithAi', [aiProviderEl.value, aiConversation, savedAiModel], (res) => {
         if (!res.ok) {
           setAiStatus((res.errors || ['AI 討論失敗。']).join('\n'), true);
+          aiChatInputEl.focus();
           return;
         }
         const assistantMessage = { role: 'assistant', content: String(res.reply || '').trim() };
@@ -1359,7 +1487,24 @@ var qrcodegen;
         } else {
           setAiStatus('AI 尚未整理出「目前表單雛型」，請繼續討論；核准按鈕會保持停用。', true);
         }
+        aiChatInputEl.focus();
       });
+    }
+
+    function handleChatKeydown(event) {
+      if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      if (!aiChatSendBtn.disabled) sendAiChat();
+    }
+
+    function resizeChatInput() {
+      aiChatInputEl.style.height = 'auto';
+      aiChatInputEl.style.height = `${Math.min(aiChatInputEl.scrollHeight, 180)}px`;
+      updateChatSendState();
+    }
+
+    function updateChatSendState() {
+      aiChatSendBtn.disabled = isBusy || !hasStoredAiKey || !savedAiModel || aiChatInputEl.value.trim().length < 2;
     }
 
     function resetAiDiscussion(askForConfirmation) {
@@ -1372,19 +1517,59 @@ var qrcodegen;
         content: '請先告訴我這份表單的用途、填寫對象，以及你目前想到的問題。我會用白話文和你逐步討論，不會直接產生 JSON。'
       });
       aiChatInputEl.value = '';
+      resizeChatInput();
       aiApproveBtn.disabled = true;
+      if (askForConfirmation) aiChatInputEl.focus();
     }
 
     function appendChatMessage(message) {
       const article = document.createElement('article');
       article.className = `chat-message ${message.role === 'user' ? 'user' : 'assistant'}`;
+      const avatar = document.createElement('span');
+      avatar.className = 'chat-avatar';
+      avatar.textContent = message.role === 'user' ? '你' : 'AI';
+      avatar.setAttribute('aria-hidden', 'true');
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-content';
       const label = document.createElement('small');
+      label.className = 'chat-role';
       label.textContent = message.role === 'user' ? '你' : 'AI';
       const content = document.createElement('div');
       content.textContent = message.content;
-      article.append(label, content);
+      bubble.append(label, content);
+      article.append(avatar, bubble);
       aiChatLogEl.append(article);
       aiChatLogEl.scrollTop = aiChatLogEl.scrollHeight;
+    }
+
+    function showChatThinking() {
+      removeChatThinking();
+      const article = document.createElement('article');
+      article.id = 'aiChatThinking';
+      article.className = 'chat-message assistant';
+      const avatar = document.createElement('span');
+      avatar.className = 'chat-avatar';
+      avatar.textContent = 'AI';
+      avatar.setAttribute('aria-hidden', 'true');
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-content';
+      const label = document.createElement('small');
+      label.className = 'chat-role';
+      label.textContent = 'AI 正在思考';
+      const dots = document.createElement('span');
+      dots.className = 'typing-dots';
+      dots.setAttribute('aria-label', 'AI 正在思考');
+      dots.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
+      bubble.append(label, dots);
+      article.append(avatar, bubble);
+      aiChatLogEl.append(article);
+      aiChatLogEl.setAttribute('aria-busy', 'true');
+      aiChatLogEl.scrollTop = aiChatLogEl.scrollHeight;
+    }
+
+    function removeChatThinking() {
+      document.getElementById('aiChatThinking')?.remove();
+      aiChatLogEl.removeAttribute('aria-busy');
     }
 
     function approveOutlineAndGenerateJson() {
@@ -1528,11 +1713,14 @@ var qrcodegen;
     }
 
     function setBusy(busy) {
+      isBusy = busy;
       buttons.forEach((button) => button.disabled = busy);
       if (!busy) {
+        removeChatThinking();
         aiApproveBtn.disabled = !currentOutline;
         aiModelEl.disabled = aiModelEl.options.length === 0 || !aiModelEl.value;
       }
+      updateChatSendState();
     }
 
     function escapeHtml(value) {

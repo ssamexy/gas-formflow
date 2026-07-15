@@ -38,7 +38,7 @@ function doGet(e) {
   }
   if (e && e.parameter && e.parameter.mode === 'health') {
     return ContentService
-      .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.3.0' }))
+      .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.3.1' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
   return HtmlService.createTemplateFromFile('Index').evaluate()
@@ -252,7 +252,7 @@ function apiSelfTest() {
   return {
     ok: allPassed,
     app: 'GAS FormFlow',
-    version: '0.3.0',
+    version: '0.3.1',
     startedAt: startedAt,
     finishedAt: new Date().toISOString(),
     sideEffects: 'none',

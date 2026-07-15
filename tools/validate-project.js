@@ -128,12 +128,14 @@ if (distCode.includes('generativelanguage.googleapis.com/v1beta?key=')) fail('Ge
 if (!distCode.includes('safeCellText')) fail('dist/Code.gs missing spreadsheet formula-injection guard');
 if (distCode.includes('DriveApp.')) fail('dist/Code.gs should not require broad DriveApp access');
 const distHtml = fs.existsSync(path.join(root, 'dist/Index.html')) ? fs.readFileSync(path.join(root, 'dist/Index.html'), 'utf8') : '';
-for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e', 'qrcodegen.QrCode.encodeText', 'white-space: pre-wrap', 'detectAiModels', 'saveAiKey', 'sendAiChat', 'approveOutlineAndGenerateJson', 'ai-chat-log', 'ai-approve-outline']) {
+for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e', 'qrcodegen.QrCode.encodeText', 'white-space: pre-wrap', 'detectAiModels', 'saveAiKey', 'sendAiChat', 'handleChatKeydown', 'updateChatSendState', 'showChatThinking', 'approveOutlineAndGenerateJson', 'ai-chat-log', 'chat-composer', 'ai-approve-outline']) {
   if (!distHtml.includes(helper)) fail(`dist/Index.html missing ${helper}`);
 }
 if (!distHtml.includes('type="password"') || !distHtml.includes('儲存後此欄位會清空')) fail('AI key UI must be masked and explain post-save clearing');
 if (!distHtml.includes('content.textContent = message.content')) fail('AI chat messages must render with textContent');
 if (!distHtml.includes("assistantMessage.content.includes('目前表單雛型')")) fail('Outline approval must stay disabled until the AI explicitly returns the labeled outline');
+if (!distHtml.includes("event.key !== 'Enter'") || !distHtml.includes('event.shiftKey') || !distHtml.includes('event.isComposing') || !distHtml.includes('event.preventDefault()')) fail('AI chat must send on Enter, preserve Shift+Enter, and avoid IME composition submission');
+if (!distHtml.includes('maxlength="6000"')) fail('AI chat input must match the backend per-message length limit');
 if (distHtml.includes("<?!= include('QrCodeLibrary') ?>")) fail('dist/Index.html must inline the QR library');
 if (distHtml.includes('renderQrPlaceholder') || distHtml.includes('QR placeholder')) fail('dist/Index.html must not contain the QR placeholder');
 verifyInlineScripts(distHtml);
