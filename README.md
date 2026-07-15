@@ -2,7 +2,7 @@
 
 用 Google Forms + Google Apps Script 打造私有化、免費、AI-ready 的表單工作流。
 
-只需設定一次，之後即可在手機上貼入 AI 產生的 JSON，一鍵建立 Google Form、回應 Sheet、QR code placeholder、公告文案與基本統計骨架。
+只需設定一次，之後即可在手機上貼入 AI 產生的 JSON，一鍵建立 Google Form、回應 Sheet、可掃描 QR code、公告文案與基本統計骨架。
 
 ## 適合用途
 
@@ -118,7 +118,7 @@ tools/     本地打包與驗證腳本
 
 ## QR code 狀態
 
-v1 目前提供 QR provider 架構與可下載 SVG placeholder，不依賴外部 QR API，也不使用已淘汰的 Google Image Charts API。完整離線 QR 編碼器列為 v1.1 工作項。
+QR code 會由 Web App 在瀏覽器內使用內嵌的 Nayuki QR Code generator v1.8.0 產生，可直接掃描並下載為 SVG。表單網址不會傳送給外部 QR API。
 
 ## AI Agent 驗證
 

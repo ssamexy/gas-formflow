@@ -41,9 +41,13 @@ function doGet(e) {
       .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.1.0' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
-  return HtmlService.createHtmlOutputFromFile('Index')
+  return HtmlService.createTemplateFromFile('Index').evaluate()
     .setTitle('GAS FormFlow')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
 function setup() {
@@ -128,6 +132,7 @@ function createFormFlow_(jsonText) {
     return {
       ok: true,
       title: spec.title,
+      formDescription: formResult.description,
       publishedUrl: formResult.publishedUrl,
       editUrl: formResult.editUrl,
       sheetUrl: sheetResult.sheetUrl,
@@ -158,6 +163,7 @@ function apiSelfTest() {
   checks.push({
     name: 'preview contains form and sheet structure',
     ok: preview.ok && preview.form.itemCount === sample.items.length &&
+      preview.form.description === sample.description &&
       preview.sheet.sheets.indexOf('Summary') !== -1 &&
       preview.sheet.cleanDataColumns.indexOf('name') !== -1,
     detail: preview.ok ? preview.sheet.summaryPlan : preview.errors

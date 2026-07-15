@@ -86,6 +86,7 @@ var SchemaValidator = (function () {
       if (!hasText(item.title) && item.type !== 'pageBreak') errors.push(label + ' 缺少 title。');
       if (hasText(item.title) && item.title.length > LIMITS.maxTextChars) errors.push(label + ' 的 title 過長。');
       if (item.helpText && String(item.helpText).length > LIMITS.maxTextChars) errors.push(label + ' 的 helpText 過長。');
+      if (item.description && String(item.description).length > LIMITS.maxTextChars) errors.push(label + ' 的 description 過長。');
       if (OPTION_TYPES[item.type] && !hasStringArray(item.options)) {
         errors.push(label + ' 是選項題，必須提供 options array。');
       }

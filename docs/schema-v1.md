@@ -38,7 +38,7 @@
 - `grid`
 - `checkboxGrid`
 
-Every item should include `key`, `type`, and `title`. `key` must start with a letter and use only letters, numbers, and underscores.
+Every item should include `key`, `type`, and `title`. `key` must start with a letter and use only letters, numbers, and underscores. Use `helpText` for question help text; `description` is also accepted as an alias for compatibility with AI-generated specs.
 
 Option fields (`multipleChoice`, `checkbox`, `dropdown`) require `options`. Grid fields (`grid`, `checkboxGrid`) require `rows` and `columns`.
 

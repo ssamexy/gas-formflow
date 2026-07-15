@@ -79,6 +79,7 @@
     .list { display: grid; gap: 8px; }
     .item { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; }
     .item small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+    .item .multiline { white-space: pre-wrap; }
     .result a { color: var(--accent-strong); overflow-wrap: anywhere; }
     .qr {
       display: grid;
@@ -90,6 +91,7 @@
       background: #fff;
       margin: 8px 0;
     }
+    .qr svg { display: block; width: 100%; height: 100%; padding: 12px; }
     .copybox {
       width: 100%;
       min-height: 150px;
@@ -139,6 +141,7 @@
       </aside>
     </div>
   </main>
+  <script><?!= include('QrCodeLibrary') ?></script>
   <script>
     const examples = {
       event: {
@@ -278,9 +281,9 @@
       const form = data.form;
       const sheet = data.sheet;
       previewEl.innerHTML = `
-        <div class="item"><strong>${escapeHtml(form.title)}</strong><small>${escapeHtml(form.description || '')}</small><small>題目數量：${form.itemCount}</small></div>
+        <div class="item"><strong>${escapeHtml(form.title)}</strong><small class="multiline">${escapeHtml(form.description || '')}</small><small>題目數量：${form.itemCount}</small></div>
         <h3>題目</h3>
-        ${form.items.map((item) => `<div class="item"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.key)} · ${escapeHtml(item.type)} · ${item.required ? '必填' : '非必填'}</small><small>${escapeHtml([...(item.options || []), ...(item.rows || []), ...(item.columns || [])].join(' / '))}</small></div>`).join('')}
+        ${form.items.map((item) => `<div class="item"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.key)} · ${escapeHtml(item.type)} · ${item.required ? '必填' : '非必填'}</small>${item.helpText ? `<small class="multiline">${escapeHtml(item.helpText)}</small>` : ''}<small>${escapeHtml([...(item.options || []), ...(item.rows || []), ...(item.columns || [])].join(' / '))}</small></div>`).join('')}
         <h3>Sheet 結構</h3>
         <div class="item"><strong>分頁</strong><small>${sheet.sheets.map(escapeHtml).join(' / ')}</small></div>
         <div class="item"><strong>Clean_Data 欄位</strong><small>${sheet.cleanDataColumns.map(escapeHtml).join(' | ')}</small></div>
@@ -291,7 +294,7 @@
     }
 
     function renderResult(res) {
-      const qrSvg = renderQrPlaceholder(res.publishedUrl);
+      const qrSvg = renderQrCode(res.qrCode?.text || res.publishedUrl);
       resultEl.innerHTML = `
         <h3>建立結果</h3>
         <div class="item"><strong>填寫連結</strong><small><a href="${escapeAttr(res.publishedUrl)}" target="_blank">${escapeHtml(res.publishedUrl)}</a></small></div>
@@ -300,32 +303,32 @@
         <div class="item"><strong>建立時間</strong><small>${escapeHtml(res.createdAt)}</small></div>
         <h3>QR code</h3>
         <div class="qr">${qrSvg}</div>
-        <button onclick="downloadQr()">下載 QR placeholder</button>
+        <button onclick="downloadQr()">下載 QR code</button>
         <h3>公告文案</h3>
         <div id="announcement" class="copybox">${escapeHtml(res.announcement)}</div>
         <button onclick="copyAnnouncement()">複製公告</button>
       `;
     }
 
-    function renderQrPlaceholder(text) {
-      const safe = escapeHtml(text);
-      let cells = '';
-      for (let y = 0; y < 21; y++) {
-        for (let x = 0; x < 21; x++) {
-          const finder = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
-          const hash = (x * 31 + y * 17 + text.length * 13 + text.charCodeAt((x + y) % text.length)) % 5;
-          if (finder || hash === 0 || hash === 3) cells += `<rect x="${x}" y="${y}" width="1" height="1"/>`;
+    function renderQrCode(text) {
+      const qr = qrcodegen.QrCode.encodeText(String(text), qrcodegen.QrCode.Ecc.MEDIUM);
+      const border = 4;
+      const size = qr.size + border * 2;
+      const modules = [];
+      for (let y = 0; y < qr.size; y++) {
+        for (let x = 0; x < qr.size; x++) {
+          if (qr.getModule(x, y)) modules.push(`M${x + border},${y + border}h1v1h-1z`);
         }
       }
-      window.__lastQrSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21"><rect width="21" height="21" fill="white"/><g fill="#17201b">${cells}</g></svg>`;
-      return `<div>${window.__lastQrSvg}<small>v1 placeholder<br>${safe}</small></div>`;
+      window.__lastQrSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="white"/><path d="${modules.join('')}" fill="#17201b"/></svg>`;
+      return window.__lastQrSvg;
     }
 
     function downloadQr() {
       const blob = new Blob([window.__lastQrSvg || ''], { type: 'image/svg+xml' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'gas-formflow-qr-placeholder.svg';
+      a.download = 'gas-formflow-qr-code.svg';
       a.click();
       URL.revokeObjectURL(a.href);
     }

@@ -37,4 +37,4 @@ During the first authorization, Google may show an unverified app warning. This 
 3. Click Validate.
 4. Click Preview.
 5. Click Create form.
-6. Copy the form URL, announcement text, and QR placeholder as needed.
+6. Copy the form URL, announcement text, and QR code as needed.

@@ -9,7 +9,7 @@ var FormBuilder = (function () {
           key: item.key,
           type: item.type,
           title: item.title || '',
-          helpText: item.helpText || '',
+          helpText: item.helpText || item.description || '',
           required: !!item.required,
           options: item.options || [],
           rows: item.rows || [],
@@ -21,13 +21,15 @@ var FormBuilder = (function () {
 
   function create(spec) {
     var form = FormApp.create(spec.title);
-    if (spec.description) form.setDescription(spec.description);
+    var description = spec.description ? String(spec.description) : '';
+    form.setDescription(description);
     if (spec.confirmationMessage) form.setConfirmationMessage(spec.confirmationMessage);
     spec.items.forEach(function (item) {
       addItem(form, item);
     });
     return {
       form: form,
+      description: form.getDescription(),
       publishedUrl: form.getPublishedUrl(),
       editUrl: form.getEditUrl()
     };
@@ -76,12 +78,12 @@ var FormBuilder = (function () {
       case 'sectionHeader':
         created = form.addSectionHeaderItem();
         created.setTitle(item.title);
-        if (item.helpText) created.setHelpText(item.helpText);
+        setHelpText(created, item);
         break;
       case 'pageBreak':
         created = form.addPageBreakItem();
         if (item.title) created.setTitle(item.title);
-        if (item.helpText) created.setHelpText(item.helpText);
+        setHelpText(created, item);
         break;
       case 'grid':
         created = form.addGridItem();
@@ -102,8 +104,13 @@ var FormBuilder = (function () {
 
   function setCommon(formItem, item) {
     formItem.setTitle(item.title);
-    if (item.helpText) formItem.setHelpText(item.helpText);
+    setHelpText(formItem, item);
     if (typeof formItem.setRequired === 'function') formItem.setRequired(!!item.required);
+  }
+
+  function setHelpText(formItem, item) {
+    var helpText = item.helpText || item.description || '';
+    if (helpText) formItem.setHelpText(String(helpText));
   }
 
   return {

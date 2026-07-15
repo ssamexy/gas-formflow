@@ -39,7 +39,10 @@ const code = banner + codeFiles.map((file) => {
 
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(root, 'dist/Code.gs'), code, 'utf8');
-fs.copyFileSync(path.join(root, 'src/Index.html'), path.join(root, 'dist/Index.html'));
+const indexTemplate = fs.readFileSync(path.join(root, 'src/Index.html'), 'utf8');
+const qrCodeLibrary = fs.readFileSync(path.join(root, 'src/QrCodeLibrary.html'), 'utf8');
+const distIndex = indexTemplate.replace("<?!= include('QrCodeLibrary') ?>", qrCodeLibrary);
+fs.writeFileSync(path.join(root, 'dist/Index.html'), distIndex, 'utf8');
 fs.copyFileSync(path.join(root, manifestByMode[mode]), path.join(root, 'dist/appsscript.json'));
 if (mode === 'private') {
   fs.copyFileSync(path.join(root, manifestByMode[mode]), path.join(root, 'appsscript.json'));

@@ -68,7 +68,7 @@ Recommended human-approved flow:
    - edit form URL
    - Sheet URL
    - announcement text
-   - QR placeholder
+   - QR code
 7. Open the Sheet and confirm these tabs exist:
    - `Form Responses 1`
    - `Clean_Data`

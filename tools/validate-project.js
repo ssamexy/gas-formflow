@@ -11,6 +11,7 @@ const required = [
   'src/SummaryBuilder.gs',
   'src/SchemaValidator.gs',
   'src/QrCodeBuilder.gs',
+  'src/QrCodeLibrary.html',
   'src/Index.html',
   'dist/Code.gs',
   'dist/Index.html',
@@ -116,9 +117,13 @@ if (!distCode.includes('公開 AI agent 驗證模式不允許未帶 token 的建
 if (!distCode.includes('safeCellText')) fail('dist/Code.gs missing spreadsheet formula-injection guard');
 if (distCode.includes('DriveApp.')) fail('dist/Code.gs should not require broad DriveApp access');
 const distHtml = fs.existsSync(path.join(root, 'dist/Index.html')) ? fs.readFileSync(path.join(root, 'dist/Index.html'), 'utf8') : '';
-for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e']) {
+for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e', 'qrcodegen.QrCode.encodeText', 'white-space: pre-wrap']) {
   if (!distHtml.includes(helper)) fail(`dist/Index.html missing ${helper}`);
 }
+if (distHtml.includes("<?!= include('QrCodeLibrary') ?>")) fail('dist/Index.html must inline the QR library');
+if (distHtml.includes('renderQrPlaceholder') || distHtml.includes('QR placeholder')) fail('dist/Index.html must not contain the QR placeholder');
+verifyQrEncoder();
+verifyFormDescriptions();
 
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'dist/appsscript.json'), 'utf8'));
 const privateManifest = JSON.parse(fs.readFileSync(path.join(root, 'config/appsscript.private.json'), 'utf8'));
@@ -226,6 +231,43 @@ function validateSpecLikeGas(spec) {
 function safeCellTextLikeGas(value) {
   const text = String(value == null ? '' : value);
   return /^[=+\-@]/.test(text) ? `'${text}` : text;
+}
+
+function verifyQrEncoder() {
+  const qrLibrary = fs.readFileSync(path.join(root, 'src/QrCodeLibrary.html'), 'utf8');
+  const qrcodegen = new Function(`${qrLibrary}; return qrcodegen;`)();
+  const qr = qrcodegen.QrCode.encodeText('https://docs.google.com/forms/d/e/test/viewform', qrcodegen.QrCode.Ecc.MEDIUM);
+  if (qr.size < 21 || !qr.getModule(0, 0) || !qr.getModule(6, 6)) fail('QR encoder did not produce a valid module matrix');
+}
+
+function verifyFormDescriptions() {
+  const source = fs.readFileSync(path.join(root, 'src/FormBuilder.gs'), 'utf8');
+  const itemState = {};
+  const item = {
+    setTitle(value) { itemState.title = value; },
+    setHelpText(value) { itemState.helpText = value; },
+    setRequired(value) { itemState.required = value; }
+  };
+  const formState = {};
+  const form = {
+    setDescription(value) { formState.description = value; },
+    getDescription() { return formState.description; },
+    setConfirmationMessage() {},
+    addTextItem() { return item; },
+    getPublishedUrl() { return 'https://example.com/form'; },
+    getEditUrl() { return 'https://example.com/edit'; }
+  };
+  const FormBuilder = new Function('FormApp', `${source}; return FormBuilder;`)({ create() { return form; } });
+  const spec = {
+    title: 'Description test',
+    description: 'First line\nSecond line',
+    items: [{ key: 'name', type: 'shortText', title: 'Name', description: 'Question line 1\nQuestion line 2' }]
+  };
+  const preview = FormBuilder.preview(spec);
+  const result = FormBuilder.create(spec);
+  if (result.description !== spec.description || formState.description !== spec.description) fail('form description was not written and read back');
+  if (preview.description !== spec.description) fail('form description missing from preview');
+  if (preview.items[0].helpText !== spec.items[0].description || itemState.helpText !== spec.items[0].description) fail('item description alias was not applied as help text');
 }
 
 function validateManifest(label, manifestToCheck, expected) {

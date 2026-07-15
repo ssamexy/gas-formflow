@@ -48,9 +48,13 @@ function doGet(e) {
       .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.1.0' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
-  return HtmlService.createHtmlOutputFromFile('Index')
+  return HtmlService.createTemplateFromFile('Index').evaluate()
     .setTitle('GAS FormFlow')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
 function setup() {
@@ -135,6 +139,7 @@ function createFormFlow_(jsonText) {
     return {
       ok: true,
       title: spec.title,
+      formDescription: formResult.description,
       publishedUrl: formResult.publishedUrl,
       editUrl: formResult.editUrl,
       sheetUrl: sheetResult.sheetUrl,
@@ -165,6 +170,7 @@ function apiSelfTest() {
   checks.push({
     name: 'preview contains form and sheet structure',
     ok: preview.ok && preview.form.itemCount === sample.items.length &&
+      preview.form.description === sample.description &&
       preview.sheet.sheets.indexOf('Summary') !== -1 &&
       preview.sheet.cleanDataColumns.indexOf('name') !== -1,
     detail: preview.ok ? preview.sheet.summaryPlan : preview.errors
@@ -384,6 +390,7 @@ var SchemaValidator = (function () {
       if (!hasText(item.title) && item.type !== 'pageBreak') errors.push(label + ' 缺少 title。');
       if (hasText(item.title) && item.title.length > LIMITS.maxTextChars) errors.push(label + ' 的 title 過長。');
       if (item.helpText && String(item.helpText).length > LIMITS.maxTextChars) errors.push(label + ' 的 helpText 過長。');
+      if (item.description && String(item.description).length > LIMITS.maxTextChars) errors.push(label + ' 的 description 過長。');
       if (OPTION_TYPES[item.type] && !hasStringArray(item.options)) {
         errors.push(label + ' 是選項題，必須提供 options array。');
       }
@@ -450,7 +457,7 @@ var FormBuilder = (function () {
           key: item.key,
           type: item.type,
           title: item.title || '',
-          helpText: item.helpText || '',
+          helpText: item.helpText || item.description || '',
           required: !!item.required,
           options: item.options || [],
           rows: item.rows || [],
@@ -462,13 +469,15 @@ var FormBuilder = (function () {
 
   function create(spec) {
     var form = FormApp.create(spec.title);
-    if (spec.description) form.setDescription(spec.description);
+    var description = spec.description ? String(spec.description) : '';
+    form.setDescription(description);
     if (spec.confirmationMessage) form.setConfirmationMessage(spec.confirmationMessage);
     spec.items.forEach(function (item) {
       addItem(form, item);
     });
     return {
       form: form,
+      description: form.getDescription(),
       publishedUrl: form.getPublishedUrl(),
       editUrl: form.getEditUrl()
     };
@@ -517,12 +526,12 @@ var FormBuilder = (function () {
       case 'sectionHeader':
         created = form.addSectionHeaderItem();
         created.setTitle(item.title);
-        if (item.helpText) created.setHelpText(item.helpText);
+        setHelpText(created, item);
         break;
       case 'pageBreak':
         created = form.addPageBreakItem();
         if (item.title) created.setTitle(item.title);
-        if (item.helpText) created.setHelpText(item.helpText);
+        setHelpText(created, item);
         break;
       case 'grid':
         created = form.addGridItem();
@@ -543,8 +552,13 @@ var FormBuilder = (function () {
 
   function setCommon(formItem, item) {
     formItem.setTitle(item.title);
-    if (item.helpText) formItem.setHelpText(item.helpText);
+    setHelpText(formItem, item);
     if (typeof formItem.setRequired === 'function') formItem.setRequired(!!item.required);
+  }
+
+  function setHelpText(formItem, item) {
+    var helpText = item.helpText || item.description || '';
+    if (helpText) formItem.setHelpText(String(helpText));
   }
 
   return {
@@ -803,9 +817,9 @@ var SummaryBuilder = (function () {
 var QrCodeBuilder = (function () {
   function buildClientQrPayload(url) {
     return {
-      provider: 'client-placeholder',
+      provider: 'nayuki-qrcodegen-v1.8.0',
       text: url,
-      note: 'Index.html renders a local SVG placeholder with the form URL. Replace provider in v1.1 for full QR encoding if needed.'
+      note: 'Index.html encodes the form URL locally as a scannable SVG QR code.'
     };
   }
 
