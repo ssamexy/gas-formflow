@@ -32,7 +32,7 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.5;
     }
-    header {
+    body > header {
       padding: 18px 16px 14px;
       border-bottom: 1px solid rgba(220, 229, 225, .8);
       background: rgba(255, 255, 255, .88);
@@ -42,6 +42,28 @@
       z-index: 2;
     }
     .wrap { max-width: 1280px; margin: 0 auto; }
+    [hidden] { display: none !important; }
+    .app-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .brand-block { min-width: 0; }
+    .header-actions { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+    .connection-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 36px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .connection-dot { width: 8px; height: 8px; border-radius: 50%; background: #a7b2ad; }
+    .connection-pill.ready { color: var(--accent-strong); border-color: #b9dcd3; background: #f0faf7; }
+    .connection-pill.ready .connection-dot { background: #17a673; box-shadow: 0 0 0 3px rgba(23, 166, 115, .12); }
+    .settings-button { display: inline-flex; align-items: center; gap: 7px; }
+    .settings-button svg { width: 17px; height: 17px; }
     h1 { margin: 0; font-size: clamp(24px, 5vw, 36px); letter-spacing: -.035em; }
     .tagline { margin: 4px 0 0; color: var(--muted); }
     main { padding: 24px 16px 48px; }
@@ -53,6 +75,60 @@
       box-shadow: var(--shadow);
       padding: 18px;
     }
+    .workspace-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    .workspace-intro h2 { margin-bottom: 3px; }
+    .workspace-intro p { margin: 0; color: var(--muted); font-size: 13px; }
+    .workflow-steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 0 0 14px;
+      padding: 0;
+      list-style: none;
+    }
+    .workflow-step button {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: 48px;
+      padding: 7px 9px;
+      text-align: left;
+      color: var(--muted);
+      background: #f8faf9;
+    }
+    .workflow-step.current button { color: var(--accent-strong); border-color: #9dccbf; background: var(--accent-soft); }
+    .workflow-step.complete button { color: var(--ink); }
+    .step-number {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: #e6ece9;
+      font-size: 12px;
+      font-weight: 800;
+      flex: 0 0 auto;
+    }
+    .workflow-step.current .step-number { background: var(--accent); color: #fff; }
+    .workflow-step.complete .step-number { background: #dff2eb; color: var(--accent-strong); }
+    .step-copy { display: grid; line-height: 1.25; }
+    .step-copy strong { font-size: 12px; }
+    .step-copy small { font-size: 10px; color: inherit; opacity: .78; }
+    .onboarding-card {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+      padding: 14px;
+      border: 1px solid #a9d3c8;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #edf9f5, #f9fcfb);
+    }
+    .onboarding-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 850; }
+    .onboarding-card h3 { margin: 0 0 2px; font-size: 15px; }
+    .onboarding-card p { margin: 0; color: var(--muted); font-size: 12px; }
     .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
     button, select, input {
       min-height: 40px;
@@ -183,6 +259,8 @@
       *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
     }
     .chat-composer-wrap { position: relative; padding: 0 16px 16px; background: linear-gradient(180deg, rgba(248, 250, 249, 0), #f8faf9 22%); }
+    .starter-prompts { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 16px 12px; }
+    .starter-prompts button { min-height: 34px; border-radius: 999px; color: var(--accent-strong); background: #fff; font-size: 12px; font-weight: 650; }
     .chat-composer {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
@@ -222,9 +300,17 @@
     .composer-hint kbd { padding: 1px 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: #f8faf9; font: inherit; }
     .approval-bar { margin: 0; padding: 14px 18px 18px; border-top: 1px solid var(--line); background: #f1f8f6; }
     .approval-bar p { margin: 4px 0 10px; }
-    .json-heading { margin-top: 18px; }
+    .artifact-panel { margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; background: #fbfcfc; overflow: hidden; }
+    .artifact-panel summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; cursor: pointer; font-weight: 800; }
+    .artifact-panel summary::marker { color: var(--accent); }
+    .artifact-body { padding: 0 14px 14px; }
+    .advanced-badge { padding: 3px 7px; border-radius: 999px; background: #edf1ef; color: var(--muted); font-size: 10px; font-weight: 800; }
     .json-hint { margin: -4px 0 10px; color: var(--muted); font-size: 13px; }
     .preview-panel { position: sticky; top: 104px; max-height: calc(100vh - 122px); overflow: auto; }
+    .empty-state { display: grid; place-items: center; min-height: 360px; padding: 32px 20px; text-align: center; color: var(--muted); }
+    .empty-state-icon { display: grid; place-items: center; width: 58px; height: 58px; margin-bottom: 12px; border-radius: 18px; background: var(--accent-soft); color: var(--accent); font-size: 25px; }
+    .empty-state h3 { margin: 0 0 5px; color: var(--ink); font-size: 16px; }
+    .empty-state p { max-width: 280px; margin: 0 0 14px; font-size: 13px; }
     .ai-status, .model-info { display: block; margin-top: 8px; color: var(--muted); white-space: pre-wrap; }
     .copybox {
       width: 100%;
@@ -236,63 +322,102 @@
       overflow-wrap: anywhere;
       background: #fbfcfa;
     }
+    dialog {
+      width: min(92vw, 560px);
+      max-height: min(86vh, 760px);
+      padding: 0;
+      border: 0;
+      border-radius: 18px;
+      color: var(--ink);
+      background: #fff;
+      box-shadow: 0 28px 80px rgba(14, 31, 25, .24);
+    }
+    dialog.settings-dialog { width: min(94vw, 680px); }
+    dialog::backdrop { background: rgba(15, 28, 23, .48); backdrop-filter: blur(3px); }
+    .dialog-layout { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: inherit; }
+    .dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+    .dialog-header h2 { margin: 0 0 3px; }
+    .dialog-header p { margin: 0; color: var(--muted); font-size: 12px; }
+    .dialog-close { display: grid; place-items: center; width: 36px; min-height: 36px; padding: 0; border-radius: 50%; font-size: 20px; color: var(--muted); }
+    .dialog-body { overflow-y: auto; padding: 18px 20px; }
+    .dialog-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 14px 20px 18px; border-top: 1px solid var(--line); background: #fbfcfc; }
+    .settings-section + .settings-section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+    .settings-section h3 { margin: 0 0 8px; }
+    .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .button-danger { color: var(--danger); border-color: #efc3bf; background: #fff8f7; }
+    .confirm-detail { max-height: 240px; overflow: auto; margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #f8faf9; white-space: pre-wrap; font-size: 12px; }
     @media (max-width: 840px) {
       .grid { grid-template-columns: 1fr; }
       textarea { min-height: 46vh; }
       .ai-grid { grid-template-columns: 1fr; }
       .field.full { grid-column: auto; }
       .preview-panel { position: static; max-height: none; }
-      header { position: static; }
+      body > header { position: static; }
       .panel { padding: 14px; border-radius: 14px; }
       .chat-panel { padding: 0; }
       .chat-header { padding: 14px; }
       .chat-log { min-height: 320px; padding: 18px 12px 22px; }
       .chat-composer-wrap { padding: 0 10px 12px; }
       .composer-hint { display: none; }
+      .app-header { align-items: flex-start; }
+      .tagline, .connection-pill { display: none; }
+      .settings-button span { display: none; }
+      .workflow-steps { gap: 5px; }
+      .workflow-step button { min-height: 42px; padding: 6px; }
+      .step-copy small { display: none; }
+      .onboarding-card { grid-template-columns: auto minmax(0, 1fr); }
+      .onboarding-card button { grid-column: 1 / -1; width: 100%; }
+      .dialog-header, .dialog-body, .dialog-footer { padding-left: 16px; padding-right: 16px; }
     }
   </style>
 </head>
 <body>
   <header>
-    <div class="wrap">
-      <h1>GAS FormFlow</h1>
-      <p class="tagline" data-i18n="tagline">先與 AI 討論表單雛型，確認後轉成 JSON，再預覽並建立 Google Form。</p>
+    <div class="wrap app-header">
+      <div class="brand-block">
+        <h1>GAS FormFlow</h1>
+        <p class="tagline" data-i18n="tagline">先討論表單雛型，再由你確認、預覽與建立。</p>
+      </div>
+      <div class="header-actions">
+        <span id="connectionStatus" data-testid="connection-status" class="connection-pill">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span id="connectionLabel">讀取 AI 設定…</span>
+        </span>
+        <button id="aiSettingsBtn" data-testid="ai-settings-open" class="settings-button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.12.37.34.7.64.95.3.25.67.4 1.06.4H21v4h-.09a1.7 1.7 0 0 0-1.51.65Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>AI 設定</span>
+        </button>
+      </div>
     </div>
   </header>
   <main class="wrap">
     <div class="grid">
       <section class="panel">
-        <h2>AI 表單設計工作台</h2>
-        <details class="ai-panel" open>
-          <summary>0. API Key 與模型設定</summary>
-          <p class="hint">Key 會分 provider 儲存在你的 Apps Script Properties。密碼欄只用圓點顯示，儲存後立即清空，後端只回傳「是否已儲存」。</p>
-          <small id="aiProviderInfo" class="model-info"></small>
-          <div class="ai-grid">
-            <label class="field">API Provider
-              <select id="aiProvider" data-testid="ai-provider">
-                <option value="google-gemini">Google Gemini API</option>
-                <option value="groq">Groq API</option>
-              </select>
-            </label>
-            <label class="field">API Key
-              <input id="aiApiKey" data-testid="ai-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="輸入新的 API Key">
-              <span class="key-note">畫面不會顯示明碼；儲存後此欄位會清空。</span>
-            </label>
-            <label class="field full">支援的模型
-              <select id="aiModel" data-testid="ai-model" disabled>
-                <option value="">請先偵測模型</option>
-              </select>
-            </label>
+        <div class="workspace-intro">
+          <div>
+            <h2>建立你的表單</h2>
+            <p>跟著三個步驟完成；進階 JSON 不會擋住第一次使用。</p>
           </div>
-          <div class="toolbar">
-            <button id="aiSaveKeyBtn" data-testid="ai-save-key">安全儲存 Key</button>
-            <button id="aiDetectBtn" data-testid="ai-detect-models">偵測支援模型</button>
-            <button id="aiSaveModelBtn" data-testid="ai-save-model">儲存選定模型</button>
-            <button id="aiClearBtn" data-testid="ai-clear-settings">清除 AI 設定</button>
+        </div>
+        <ol class="workflow-steps" aria-label="表單建立進度">
+          <li id="workflowSetup" class="workflow-step current">
+            <button id="workflowSetupBtn" type="button"><span class="step-number">1</span><span class="step-copy"><strong>連接 AI</strong><small>Key 與模型</small></span></button>
+          </li>
+          <li id="workflowDiscuss" class="workflow-step">
+            <button id="workflowDiscussBtn" type="button"><span class="step-number">2</span><span class="step-copy"><strong>討論雛型</strong><small>釐清表單內容</small></span></button>
+          </li>
+          <li id="workflowBuild" class="workflow-step">
+            <button id="workflowBuildBtn" type="button"><span class="step-number">3</span><span class="step-copy"><strong>預覽建立</strong><small>確認後建立</small></span></button>
+          </li>
+        </ol>
+        <section id="onboardingCard" data-testid="setup-empty-state" class="onboarding-card" hidden>
+          <div class="onboarding-icon" aria-hidden="true">1</div>
+          <div>
+            <h3>先完成 AI 連線</h3>
+            <p>設定自己的 Gemini 或 Groq Key，再選一個可用模型。Key 不會顯示在主畫面。</p>
           </div>
-          <small id="aiStatus" data-testid="ai-status" class="ai-status">正在讀取 AI 設定...</small>
-          <small id="aiModelInfo" class="model-info"></small>
-        </details>
+          <button id="onboardingSettingsBtn" data-testid="setup-primary-action" class="primary">開啟 AI 設定</button>
+        </section>
 
         <section class="ai-panel chat-panel" aria-labelledby="discussionHeading">
           <div class="chat-header">
@@ -305,6 +430,11 @@
           </div>
           <div class="chat-shell">
             <div id="aiChatLog" data-testid="ai-chat-log" class="chat-log" aria-live="polite" aria-label="AI 表單設計對話"></div>
+            <div id="starterPrompts" class="starter-prompts" aria-label="開始範例">
+              <button type="button" data-starter-prompt="我要設計一份活動報名表，請先問我活動與參加者需要哪些資料。">活動報名</button>
+              <button type="button" data-starter-prompt="我要設計一份課後回饋表，請和我討論題目與統計方式。">課後回饋</button>
+              <button type="button" data-starter-prompt="我要調查大家的參與意願與可配合時段，請幫我整理需求。">意願與時段調查</button>
+            </div>
             <div class="chat-composer-wrap">
               <div class="chat-composer">
                 <textarea id="aiChatInput" data-testid="ai-chat-input" class="chat-input" rows="1" maxlength="6000" aria-label="輸入要和 AI 討論的內容" placeholder="描述表單用途、填寫對象，或回覆 AI 的問題…"></textarea>
@@ -322,30 +452,114 @@
           </div>
         </section>
 
-        <h2 class="json-heading">2. FormFlow JSON</h2>
-        <p class="json-hint">這是獨立編輯區：可由上方核准流程填入，也可以貼上其他 AI 產生的 JSON，再自行修改、驗證與預覽。</p>
-        <div class="toolbar">
-          <select id="exampleSelect" data-testid="example-select" aria-label="載入範例">
-            <option value="">載入範例 JSON</option>
-            <option value="event">活動報名</option>
-            <option value="attendance">出席統計</option>
-            <option value="willingness">志工意願</option>
-            <option value="feedback">滿意度回饋</option>
-          </select>
-          <button id="validateBtn" data-testid="validate-button">驗證 JSON</button>
-          <button id="previewBtn" data-testid="preview-button">更新右側預覽</button>
-          <button id="createBtn" data-testid="create-button" class="primary">建立表單</button>
-        </div>
-        <textarea id="jsonInput" data-testid="json-input" spellcheck="false" aria-label="JSON 輸入"></textarea>
-        <div id="status" data-testid="status" class="status">請貼上 GAS FormFlow v1 JSON，或先載入範例。</div>
+        <details id="jsonPanel" class="artifact-panel">
+          <summary>
+            <span>FormFlow JSON 編輯區</span>
+            <span class="advanced-badge">進階／可貼入其他 AI 結果</span>
+          </summary>
+          <div class="artifact-body">
+            <p class="json-hint">核准雛型後會自動填入；也可以貼上其他 AI 產生的 JSON，再自行修改、驗證與預覽。</p>
+            <div class="toolbar">
+              <select id="exampleSelect" data-testid="example-select" aria-label="載入範例">
+                <option value="">載入範例 JSON</option>
+                <option value="event">活動報名</option>
+                <option value="attendance">出席統計</option>
+                <option value="willingness">志工意願</option>
+                <option value="feedback">滿意度回饋</option>
+              </select>
+              <button id="validateBtn" data-testid="validate-button">驗證 JSON</button>
+              <button id="previewBtn" data-testid="preview-button">更新右側預覽</button>
+              <button id="createBtn" data-testid="create-button" class="primary">建立表單</button>
+            </div>
+            <textarea id="jsonInput" data-testid="json-input" spellcheck="false" aria-label="JSON 輸入"></textarea>
+            <div id="status" data-testid="status" class="status">可貼上 GAS FormFlow v1 JSON，或先載入範例。</div>
+          </div>
+        </details>
       </section>
       <aside class="panel preview-panel">
-        <h2>預覽與結果</h2>
-        <div id="preview" data-testid="preview" class="list"></div>
+        <h2>表單預覽</h2>
+        <div id="preview" data-testid="preview" class="list">
+          <div class="empty-state">
+            <div>
+              <div class="empty-state-icon" aria-hidden="true">▤</div>
+              <h3>預覽會出現在這裡</h3>
+              <p>先完成 AI 設定並討論表單；核准雛型後會自動產生預覽。</p>
+              <button id="previewStartBtn" type="button">開始第一步</button>
+            </div>
+          </div>
+        </div>
         <div id="result" data-testid="result" class="result"></div>
       </aside>
     </div>
   </main>
+  <dialog id="aiSettingsDialog" data-testid="ai-settings-dialog" class="settings-dialog" aria-labelledby="aiSettingsTitle">
+    <div class="dialog-layout">
+      <header class="dialog-header">
+        <div>
+          <h2 id="aiSettingsTitle">AI 設定</h2>
+          <p>Key 儲存在你的 Apps Script Properties，主畫面不會顯示。</p>
+        </div>
+        <button id="aiSettingsCloseBtn" type="button" class="dialog-close" aria-label="關閉 AI 設定">×</button>
+      </header>
+      <div class="dialog-body">
+        <section class="settings-section">
+          <h3>1. 選擇服務與儲存 Key</h3>
+          <small id="aiProviderInfo" class="model-info"></small>
+          <div class="ai-grid">
+            <label class="field">AI Provider
+              <select id="aiProvider" data-testid="ai-provider" autofocus>
+                <option value="google-gemini">Google Gemini API</option>
+                <option value="groq">Groq API</option>
+              </select>
+            </label>
+            <label class="field">API Key
+              <input id="aiApiKey" data-testid="ai-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="輸入新的 API Key">
+              <span class="key-note">只以圓點顯示；儲存後此欄位會立即清空。</span>
+            </label>
+          </div>
+          <div class="settings-actions">
+            <button id="aiSaveKeyBtn" data-testid="ai-save-key" class="primary">安全儲存 Key</button>
+            <button id="aiClearBtn" data-testid="ai-clear-settings" class="button-danger">清除此服務設定</button>
+          </div>
+        </section>
+        <section class="settings-section">
+          <h3>2. 偵測並儲存模型</h3>
+          <label class="field full">支援的模型
+            <select id="aiModel" data-testid="ai-model" disabled>
+              <option value="">請先儲存 Key</option>
+            </select>
+          </label>
+          <div class="settings-actions">
+            <button id="aiDetectBtn" data-testid="ai-detect-models">重新偵測模型</button>
+            <button id="aiSaveModelBtn" data-testid="ai-save-model" class="primary">儲存選定模型</button>
+          </div>
+          <small id="aiModelInfo" class="model-info"></small>
+        </section>
+        <div id="aiStatus" data-testid="ai-status" class="status">正在讀取 AI 設定…</div>
+      </div>
+      <footer class="dialog-footer">
+        <button id="aiSettingsDoneBtn" type="button">完成</button>
+      </footer>
+    </div>
+  </dialog>
+  <dialog id="confirmDialog" data-testid="app-confirm-dialog" aria-labelledby="confirmTitle">
+    <div class="dialog-layout">
+      <header class="dialog-header">
+        <div>
+          <h2 id="confirmTitle">請確認</h2>
+          <p id="confirmMessage"></p>
+        </div>
+        <button id="confirmCloseBtn" type="button" class="dialog-close" aria-label="取消並關閉">×</button>
+      </header>
+      <div class="dialog-body">
+        <div id="confirmDetail" class="confirm-detail" hidden></div>
+      </div>
+      <footer class="dialog-footer">
+        <button id="confirmCancelBtn" type="button">取消</button>
+        <button id="confirmActionBtn" data-testid="app-confirm-action" type="button" class="primary">確認</button>
+      </footer>
+    </div>
+  </dialog>
   <script>/*
  * QR Code generator library (compiled from TypeScript)
  *
@@ -1262,6 +1476,21 @@ var qrcodegen;
     const aiChatInputEl = document.getElementById('aiChatInput');
     const aiChatSendBtn = document.getElementById('aiChatSendBtn');
     const aiApproveBtn = document.getElementById('aiApproveBtn');
+    const aiSettingsDialog = document.getElementById('aiSettingsDialog');
+    const confirmDialog = document.getElementById('confirmDialog');
+    const confirmTitleEl = document.getElementById('confirmTitle');
+    const confirmMessageEl = document.getElementById('confirmMessage');
+    const confirmDetailEl = document.getElementById('confirmDetail');
+    const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+    const confirmActionBtn = document.getElementById('confirmActionBtn');
+    const connectionStatusEl = document.getElementById('connectionStatus');
+    const connectionLabelEl = document.getElementById('connectionLabel');
+    const onboardingCardEl = document.getElementById('onboardingCard');
+    const starterPromptsEl = document.getElementById('starterPrompts');
+    const jsonPanelEl = document.getElementById('jsonPanel');
+    const workflowSetupEl = document.getElementById('workflowSetup');
+    const workflowDiscussEl = document.getElementById('workflowDiscuss');
+    const workflowBuildEl = document.getElementById('workflowBuild');
     const buttons = [...document.querySelectorAll('button, select, input')];
     let detectedAiModels = [];
     let hasStoredAiKey = false;
@@ -1269,29 +1498,45 @@ var qrcodegen;
     let aiConversation = [];
     let currentOutline = '';
     let isBusy = false;
+    let pendingConfirmation = null;
+    let hasRenderedPreview = false;
 
     document.getElementById('exampleSelect').addEventListener('change', (event) => {
       const spec = examples[event.target.value];
       if (!spec) return;
       input.value = JSON.stringify(spec, null, 2);
+      jsonPanelEl.open = true;
       setStatus('範例已載入，可以先按「預覽」。', 'ok');
       resultEl.innerHTML = '';
-      previewEl.innerHTML = '';
+      renderPreviewEmptyState('範例已載入', '按「更新右側預覽」查看這份表單。');
     });
     document.getElementById('validateBtn').addEventListener('click', validateSpec);
     document.getElementById('previewBtn').addEventListener('click', previewSpec);
-    document.getElementById('createBtn').addEventListener('click', createFlow);
+    document.getElementById('createBtn').addEventListener('click', requestCreateFlow);
     document.getElementById('aiSaveKeyBtn').addEventListener('click', saveAiKey);
     document.getElementById('aiDetectBtn').addEventListener('click', detectAiModels);
     document.getElementById('aiSaveModelBtn').addEventListener('click', saveAiModel);
-    document.getElementById('aiClearBtn').addEventListener('click', clearAiSettings);
+    document.getElementById('aiClearBtn').addEventListener('click', requestClearAiSettings);
     aiChatSendBtn.addEventListener('click', sendAiChat);
-    document.getElementById('aiChatResetBtn').addEventListener('click', () => resetAiDiscussion(true));
+    document.getElementById('aiChatResetBtn').addEventListener('click', requestResetDiscussion);
     aiChatInputEl.addEventListener('keydown', handleChatKeydown);
     aiChatInputEl.addEventListener('input', resizeChatInput);
-    aiApproveBtn.addEventListener('click', approveOutlineAndGenerateJson);
+    aiApproveBtn.addEventListener('click', requestOutlineApproval);
     aiProviderEl.addEventListener('change', switchAiProvider);
     aiModelEl.addEventListener('change', renderAiModelInfo);
+    document.getElementById('aiSettingsBtn').addEventListener('click', openAiSettings);
+    document.getElementById('onboardingSettingsBtn').addEventListener('click', openAiSettings);
+    document.getElementById('aiSettingsCloseBtn').addEventListener('click', closeAiSettings);
+    document.getElementById('aiSettingsDoneBtn').addEventListener('click', closeAiSettings);
+    document.getElementById('workflowSetupBtn').addEventListener('click', openAiSettings);
+    document.getElementById('workflowDiscussBtn').addEventListener('click', focusDiscussion);
+    document.getElementById('workflowBuildBtn').addEventListener('click', focusBuildArea);
+    document.getElementById('previewStartBtn').addEventListener('click', startCurrentStep);
+    starterPromptsEl.addEventListener('click', useStarterPrompt);
+    confirmCancelBtn.addEventListener('click', () => confirmDialog.close('cancel'));
+    document.getElementById('confirmCloseBtn').addEventListener('click', () => confirmDialog.close('cancel'));
+    confirmActionBtn.addEventListener('click', () => confirmDialog.close('confirm'));
+    confirmDialog.addEventListener('close', handleConfirmDialogClose);
     input.value = JSON.stringify(examples.event, null, 2);
     window.__e2e = {
       getExampleKeys: () => Object.keys(examples),
@@ -1299,6 +1544,8 @@ var qrcodegen;
       getStatusText: () => statusEl.textContent,
       getConversation: () => aiConversation.map((message) => ({ ...message })),
       getCurrentOutline: () => currentOutline,
+      isSettingsOpen: () => aiSettingsDialog.open,
+      isConfirmOpen: () => confirmDialog.open,
       hasPreview: () => previewEl.children.length > 0,
       loadExample: (key) => {
         if (!examples[key]) return false;
@@ -1308,7 +1555,90 @@ var qrcodegen;
     };
     resetAiDiscussion(false);
     updateProviderInfo();
+    updateWorkspaceGuidance();
     loadAiSettings();
+
+    function openAiSettings() {
+      if (!aiSettingsDialog.open) aiSettingsDialog.showModal();
+    }
+
+    function closeAiSettings() {
+      if (aiSettingsDialog.open) aiSettingsDialog.close();
+    }
+
+    function focusDiscussion() {
+      if (!hasStoredAiKey || !savedAiModel) {
+        openAiSettings();
+        return;
+      }
+      document.getElementById('discussionHeading').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      aiChatInputEl.focus({ preventScroll: true });
+    }
+
+    function focusBuildArea() {
+      if (!currentOutline && !hasRenderedPreview) {
+        focusDiscussion();
+        return;
+      }
+      document.querySelector('.preview-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function startCurrentStep() {
+      if (!hasStoredAiKey || !savedAiModel) openAiSettings();
+      else focusDiscussion();
+    }
+
+    function useStarterPrompt(event) {
+      const button = event.target.closest('[data-starter-prompt]');
+      if (!button || button.disabled) return;
+      aiChatInputEl.value = button.dataset.starterPrompt || '';
+      resizeChatInput();
+      aiChatInputEl.focus();
+    }
+
+    function updateWorkspaceGuidance() {
+      const isReady = hasStoredAiKey && !!savedAiModel;
+      connectionStatusEl.classList.toggle('ready', isReady);
+      connectionLabelEl.textContent = isReady
+        ? `${getProviderLabel()} · ${savedAiModel.replace(/^models\//, '')}`
+        : hasStoredAiKey ? '已儲存 Key · 尚未選模型' : '尚未連接 AI';
+      onboardingCardEl.hidden = isReady;
+      starterPromptsEl.hidden = !isReady || aiConversation.length > 0;
+      setWorkflowStepState(workflowSetupEl, isReady ? 'complete' : 'current');
+      setWorkflowStepState(workflowDiscussEl, currentOutline ? 'complete' : isReady ? 'current' : '');
+      setWorkflowStepState(workflowBuildEl, hasRenderedPreview ? 'complete' : currentOutline ? 'current' : '');
+    }
+
+    function setWorkflowStepState(element, state) {
+      element.classList.toggle('current', state === 'current');
+      element.classList.toggle('complete', state === 'complete');
+    }
+
+    function openConfirmation(options) {
+      pendingConfirmation = {
+        onConfirm: options.onConfirm,
+        onCancel: options.onCancel,
+        returnFocus: document.activeElement
+      };
+      confirmTitleEl.textContent = options.title;
+      confirmMessageEl.textContent = options.message;
+      confirmActionBtn.textContent = options.confirmLabel || '確認';
+      confirmActionBtn.className = options.danger ? 'button-danger' : 'primary';
+      confirmDetailEl.hidden = !options.detail;
+      confirmDetailEl.textContent = options.detail || '';
+      confirmDialog.showModal();
+      confirmCancelBtn.focus();
+    }
+
+    function handleConfirmDialogClose() {
+      const pending = pendingConfirmation;
+      pendingConfirmation = null;
+      if (!pending) return;
+      const confirmed = confirmDialog.returnValue === 'confirm';
+      if (pending.returnFocus && document.contains(pending.returnFocus)) pending.returnFocus.focus();
+      if (confirmed) pending.onConfirm();
+      else if (pending.onCancel) pending.onCancel();
+    }
 
     function switchAiProvider() {
       aiApiKeyEl.value = '';
@@ -1318,6 +1648,7 @@ var qrcodegen;
       populateAiModels([], '');
       resetAiDiscussion(false);
       updateProviderInfo();
+      updateWorkspaceGuidance();
       loadAiSettings();
     }
 
@@ -1341,6 +1672,7 @@ var qrcodegen;
         if (savedAiModel) populateAiModels([{ name: savedAiModel, label: savedAiModel.replace(/^models\//, ''), description: '', inputTokenLimit: 0, outputTokenLimit: 0 }], savedAiModel);
         setAiStatus(hasStoredAiKey ? `${getProviderLabel()} 已儲存 API Key，不會回填明碼。` : `${getProviderLabel()} 尚未儲存 API Key。請先在密碼欄輸入並按「安全儲存 Key」。`, false);
         updateChatSendState();
+        updateWorkspaceGuidance();
       });
     }
 
@@ -1363,6 +1695,7 @@ var qrcodegen;
         populateAiModels(detectedAiModels, res.model || savedAiModel);
         setAiStatus(`Key 已安全儲存並清空輸入欄；偵測到 ${detectedAiModels.length} 個適合表單設計的模型。`, false);
         updateChatSendState();
+        updateWorkspaceGuidance();
       });
     }
 
@@ -1430,11 +1763,23 @@ var qrcodegen;
         savedAiModel = res.model || aiModelEl.value;
         setAiStatus(`模型已儲存：${savedAiModel.replace(/^models\//, '')}。現在可以開始與 AI 討論。`, false);
         updateChatSendState();
+        updateWorkspaceGuidance();
       });
     }
 
+    function requestClearAiSettings() {
+      closeAiSettings();
+      setTimeout(() => openConfirmation({
+        title: `清除 ${getProviderLabel()} 設定？`,
+        message: '這會從 Apps Script Properties 刪除已儲存的 API Key 與模型。',
+        confirmLabel: '清除設定',
+        danger: true,
+        onConfirm: clearAiSettings,
+        onCancel: openAiSettings
+      }), 0);
+    }
+
     function clearAiSettings() {
-      if (!confirm('確定要從 Apps Script Properties 清除已儲存的 API Key 與模型？')) return;
       run('apiClearAiSettings', [aiProviderEl.value], (res) => {
         if (!res.ok) {
           setAiStatus((res.errors || ['AI 設定清除失敗。']).join('\n'), true);
@@ -1447,6 +1792,7 @@ var qrcodegen;
         populateAiModels([], '');
         setAiStatus('AI 設定已清除。', false);
         resetAiDiscussion(false);
+        updateWorkspaceGuidance();
       });
     }
 
@@ -1466,6 +1812,7 @@ var qrcodegen;
       }
       const userMessage = { role: 'user', content: message };
       aiConversation.push(userMessage);
+      updateWorkspaceGuidance();
       appendChatMessage(userMessage);
       aiChatInputEl.value = '';
       resizeChatInput();
@@ -1487,6 +1834,7 @@ var qrcodegen;
         } else {
           setAiStatus('AI 尚未整理出「目前表單雛型」，請繼續討論；核准按鈕會保持停用。', true);
         }
+        updateWorkspaceGuidance();
         aiChatInputEl.focus();
       });
     }
@@ -1507,8 +1855,21 @@ var qrcodegen;
       aiChatSendBtn.disabled = isBusy || !hasStoredAiKey || !savedAiModel || aiChatInputEl.value.trim().length < 2;
     }
 
-    function resetAiDiscussion(askForConfirmation) {
-      if (askForConfirmation && aiConversation.length && !confirm('確定要清除目前瀏覽器中的討論內容？')) return;
+    function requestResetDiscussion() {
+      if (!aiConversation.length) {
+        resetAiDiscussion(true);
+        return;
+      }
+      openConfirmation({
+        title: '重新開始討論？',
+        message: '目前分頁中的對話與白話文雛型會被清除；已產生的 JSON 不會受影響。',
+        confirmLabel: '重新討論',
+        danger: true,
+        onConfirm: () => resetAiDiscussion(true)
+      });
+    }
+
+    function resetAiDiscussion(focusInput) {
       aiConversation = [];
       currentOutline = '';
       aiChatLogEl.replaceChildren();
@@ -1519,7 +1880,8 @@ var qrcodegen;
       aiChatInputEl.value = '';
       resizeChatInput();
       aiApproveBtn.disabled = true;
-      if (askForConfirmation) aiChatInputEl.focus();
+      updateWorkspaceGuidance();
+      if (focusInput) aiChatInputEl.focus();
     }
 
     function appendChatMessage(message) {
@@ -1572,20 +1934,30 @@ var qrcodegen;
       aiChatLogEl.removeAttribute('aria-busy');
     }
 
-    function approveOutlineAndGenerateJson() {
+    function requestOutlineApproval() {
       if (!currentOutline || !savedAiModel) {
         setAiStatus('請先完成至少一輪討論並儲存模型。', true);
         return;
       }
-      if (!confirm('確定採用 AI 最新整理的白話文雛型，並轉成下方 FormFlow JSON？')) return;
+      openConfirmation({
+        title: '採用目前表單雛型？',
+        message: '確認後，AI 會把這份白話文雛型轉成 FormFlow JSON，開啟進階編輯區並更新右側預覽。原對話仍會保留。',
+        detail: currentOutline,
+        confirmLabel: '採用並轉成 JSON',
+        onConfirm: approveOutlineAndGenerateJson
+      });
+    }
+
+    function approveOutlineAndGenerateJson() {
       setAiStatus('正在依你核准的白話文雛型轉換並驗證 JSON...', false);
       run('apiGenerateSpecFromOutline', [aiProviderEl.value, currentOutline, savedAiModel], (res) => {
         if (res.jsonText) {
           input.value = res.jsonText;
           resultEl.innerHTML = '';
+          jsonPanelEl.open = true;
         }
         if (!res.ok) {
-          previewEl.innerHTML = '';
+          renderPreviewEmptyState('JSON 尚未通過驗證', '已保留 AI 草稿，請在進階 JSON 區修正後再更新預覽。');
           setAiStatus((res.errors || ['JSON 轉換失敗。']).join('\n'), true);
           setStatus('AI 已保留 JSON 草稿，但尚未通過驗證；你可以在獨立 JSON 區修改。', 'error');
           return;
@@ -1623,8 +1995,16 @@ var qrcodegen;
       });
     }
 
+    function requestCreateFlow() {
+      openConfirmation({
+        title: '建立 Google Form 與 Sheet？',
+        message: '這會在你的 Google 帳號建立新的表單與回應試算表。建立前請確認右側預覽與 JSON 內容。',
+        confirmLabel: '確認建立',
+        onConfirm: createFlow
+      });
+    }
+
     function createFlow() {
-      if (!confirm('確定要在你的 Google 帳號建立 Google Form 與 Google Sheet？')) return;
       setStatus('正在建立，請不要關閉視窗...', '');
       run('apiCreateFormFlow', [input.value], (res) => {
         if (!res.ok) {
@@ -1649,6 +2029,7 @@ var qrcodegen;
     function renderPreview(data) {
       const form = data.form;
       const sheet = data.sheet;
+      hasRenderedPreview = true;
       previewEl.innerHTML = `
         <div class="item"><strong>${escapeHtml(form.title)}</strong><small class="multiline">${escapeHtml(form.description || '')}</small><small>題目數量：${form.itemCount}</small></div>
         <h3>題目</h3>
@@ -1660,6 +2041,31 @@ var qrcodegen;
         <div class="item"><strong>不適合自動統計</strong><small>${sheet.nonStatFields.map(escapeHtml).join(' / ') || '無'}</small></div>
         <div class="item"><strong>統計摘要規劃</strong><small>${sheet.summaryPlan.map(escapeHtml).join(' / ')}</small></div>
       `;
+      updateWorkspaceGuidance();
+    }
+
+    function renderPreviewEmptyState(title, message) {
+      hasRenderedPreview = false;
+      previewEl.replaceChildren();
+      const section = document.createElement('div');
+      section.className = 'empty-state';
+      const content = document.createElement('div');
+      const icon = document.createElement('div');
+      icon.className = 'empty-state-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = '▤';
+      const heading = document.createElement('h3');
+      heading.textContent = title;
+      const body = document.createElement('p');
+      body.textContent = message;
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.textContent = hasStoredAiKey && savedAiModel ? '回到 AI 討論' : '開啟 AI 設定';
+      action.addEventListener('click', startCurrentStep);
+      content.append(icon, heading, body, action);
+      section.append(content);
+      previewEl.append(section);
+      updateWorkspaceGuidance();
     }
 
     function renderResult(res) {

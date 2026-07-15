@@ -129,6 +129,7 @@ QR code 會由 Web App 在瀏覽器內使用內嵌的 Nayuki QR Code generator v
 - 在瀏覽器內與 AI 多輪討論白話文表單雛型；對話不寫入 `ScriptProperties`，聊天階段不會改動 JSON。
 - 使用者明確按下「我同意目前雛型，轉成 JSON」後，才轉換、驗證並寫入獨立 JSON 編輯區。
 - JSON 編輯區也接受其他 AI 產生的 JSON，並可在右側預覽。
+- 首次使用提供「連接 AI → 討論雛型 → 預覽建立」導引與 starter prompts；Key／模型藏在 AI 設定視窗，確認動作使用應用程式內 dialog。
 - Key 不會回傳前端、寫入 log 或放進 API URL；公開 `agent` 模式停用所有 AI 功能。
 
 模型出現在清單中不代表一定具有免費額度；free tier、地區限制與 quota 由 Google 決定。完整設定方式：
