@@ -45,7 +45,7 @@ function doGet(e) {
   }
   if (e && e.parameter && e.parameter.mode === 'health') {
     return ContentService
-      .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.1.0' }))
+      .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.2.0' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
   return HtmlService.createTemplateFromFile('Index').evaluate()
@@ -96,6 +96,56 @@ function apiPreviewSpec(jsonText) {
     form: FormBuilder.preview(validation.spec),
     sheet: SheetBuilder.preview(validation.spec)
   };
+}
+
+function apiGetAiSettings(providerId) {
+  return runPrivateAiOperation_(function () {
+    return AiService.getSettings(providerId);
+  });
+}
+
+function apiListAiModels(providerId, apiKey) {
+  return runPrivateAiOperation_(function () {
+    return AiService.listModels(providerId, apiKey);
+  });
+}
+
+function apiSaveAiSettings(providerId, apiKey, modelName) {
+  return runPrivateAiOperation_(function () {
+    return AiService.saveSettings(providerId, apiKey, modelName);
+  });
+}
+
+function apiClearAiSettings(providerId) {
+  return runPrivateAiOperation_(function () {
+    return AiService.clearSettings(providerId);
+  });
+}
+
+function apiGenerateSpecWithAi(providerId, requirement, modelName) {
+  return runPrivateAiOperation_(function () {
+    return AiService.generateSpec(providerId, requirement, modelName);
+  });
+}
+
+function runPrivateAiOperation_(operation) {
+  if (isAgentMode_()) {
+    return {
+      ok: false,
+      errors: ['公開 AI agent 驗證模式不提供 API Key 與 LLM 功能。請切回 private deployment。']
+    };
+  }
+  try {
+    var result = operation() || {};
+    if (result.ok === false) return result;
+    result.ok = true;
+    return result;
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [AiService.toUserMessage(error)]
+    };
+  }
 }
 
 function apiCreateFormFlow(jsonText) {
@@ -185,7 +235,7 @@ function apiSelfTest() {
   return {
     ok: allPassed,
     app: 'GAS FormFlow',
-    version: '0.1.0',
+    version: '0.2.0',
     startedAt: startedAt,
     finishedAt: new Date().toISOString(),
     sideEffects: 'none',
@@ -441,6 +491,453 @@ var SchemaValidator = (function () {
     validateSpec: validateSpec,
     toUserMessage: toUserMessage,
     supportedTypes: Object.keys(SUPPORTED_TYPES)
+  };
+})();
+
+
+// ===== src/AiPrompt.gs =====
+var AiPrompt = (function () {
+  function buildFormFlowSystemPrompt() {
+    return [
+      'Create one valid GAS FormFlow schema v1 JSON object from the user requirement.',
+      'Return JSON only. schemaVersion must be "1.0".',
+      'Every item needs key, type, and title. Keys start with a letter and contain only letters, numbers, and underscores.',
+      'Supported types: shortText, paragraph, multipleChoice, checkbox, dropdown, date, time, scale, sectionHeader, pageBreak, grid, checkboxGrid.',
+      'multipleChoice, checkbox, and dropdown require options. grid and checkboxGrid require rows and columns.',
+      'Use Traditional Chinese. Add analysis metadata when it helps predictable summaries.',
+      'Do not use file uploads, images, videos, quizzes, or branching logic.'
+    ].join('\n');
+  }
+
+  function validateGeneratedSpec(text, model) {
+    var jsonText = stripCodeFence(text);
+    var validation = SchemaValidator.validateJsonText(jsonText);
+    if (!validation.ok) {
+      return {
+        ok: false,
+        errors: ['AI \u7522\u751f\u7684 JSON \u672a\u901a\u904e FormFlow \u9a57\u8b49\uff0c\u5df2\u4fdd\u7559\u539f\u59cb\u5167\u5bb9\u4f9b\u4fee\u6539\u3002'].concat(validation.errors),
+        jsonText: jsonText,
+        model: model
+      };
+    }
+    return {
+      jsonText: JSON.stringify(validation.spec, null, 2),
+      model: model
+    };
+  }
+
+  function stripCodeFence(text) {
+    var fence = String.fromCharCode(96, 96, 96);
+    var value = String(text || '').trim();
+    if (value.indexOf(fence) === 0) value = value.slice(fence.length).replace(/^json\s*/i, '');
+    if (value.lastIndexOf(fence) === value.length - fence.length) value = value.slice(0, -fence.length);
+    return value.trim();
+  }
+
+  return {
+    buildFormFlowSystemPrompt: buildFormFlowSystemPrompt,
+    validateGeneratedSpec: validateGeneratedSpec
+  };
+})();
+
+
+// ===== src/GeminiService.gs =====
+var GeminiService = (function () {
+  var API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+  var API_KEY_PROPERTY = 'FORMFLOW_AI_GOOGLE_API_KEY';
+  var MODEL_PROPERTY = 'FORMFLOW_AI_GOOGLE_MODEL';
+  var MAX_REQUIREMENT_CHARS = 20000;
+
+  function getSettings() {
+    var props = PropertiesService.getScriptProperties();
+    return {
+      hasApiKey: !!props.getProperty(API_KEY_PROPERTY),
+      model: props.getProperty(MODEL_PROPERTY) || ''
+    };
+  }
+
+  function listModels(apiKey) {
+    var resolvedKey = resolveApiKey(apiKey);
+    var data = requestJson('/models?pageSize=1000', { method: 'get' }, resolvedKey);
+    return (data.models || [])
+      .filter(function (model) {
+        return (model.supportedGenerationMethods || []).indexOf('generateContent') !== -1;
+      })
+      .map(toModelOption)
+      .sort(function (a, b) {
+        return a.label.localeCompare(b.label);
+      });
+  }
+
+  function saveSettings(apiKey, modelName) {
+    var resolvedKey = resolveApiKey(apiKey);
+    var normalizedModel = normalizeModelName(modelName);
+    var models = listModels(resolvedKey);
+    var isAvailable = models.some(function (model) { return model.name === normalizedModel; });
+    if (!isAvailable) throw new Error('AI_MODEL|The selected model is not available for this API key.');
+    PropertiesService.getScriptProperties().setProperties({
+      FORMFLOW_AI_GOOGLE_API_KEY: resolvedKey,
+      FORMFLOW_AI_GOOGLE_MODEL: normalizedModel
+    });
+    return getSettings();
+  }
+
+  function clearSettings() {
+    PropertiesService.getScriptProperties().deleteProperty(API_KEY_PROPERTY);
+    PropertiesService.getScriptProperties().deleteProperty(MODEL_PROPERTY);
+    return getSettings();
+  }
+
+  function generateSpec(requirement, modelName) {
+    var prompt = String(requirement || '').trim();
+    if (prompt.length < 5) throw new Error('AI_CONFIG|Please enter a form requirement.');
+    if (prompt.length > MAX_REQUIREMENT_CHARS) throw new Error('AI_CONFIG|The requirement is too long.');
+    var apiKey = resolveApiKey('');
+    var model = normalizeModelName(modelName || getSettings().model);
+    var response = requestJson('/' + model + ':generateContent', {
+      method: 'post',
+      payload: buildGenerationRequest(prompt)
+    }, apiKey);
+    return AiPrompt.validateGeneratedSpec(extractResponseText(response), model);
+  }
+
+  function toModelOption(model) {
+    var name = normalizeModelName(model.name || model.baseModelId || '');
+    return {
+      id: name.replace(/^models\//, ''),
+      name: name,
+      label: model.displayName || name.replace(/^models\//, ''),
+      description: model.description || '',
+      inputTokenLimit: Number(model.inputTokenLimit || 0),
+      outputTokenLimit: Number(model.outputTokenLimit || 0)
+    };
+  }
+
+  function resolveApiKey(apiKey) {
+    var provided = String(apiKey || '').trim();
+    var resolved = provided || PropertiesService.getScriptProperties().getProperty(API_KEY_PROPERTY) || '';
+    if (resolved.length < 20) throw new Error('AI_CONFIG|A valid Gemini API key is required.');
+    return resolved;
+  }
+
+  function normalizeModelName(modelName) {
+    var name = String(modelName || '').trim();
+    if (name && name.indexOf('models/') !== 0) name = 'models/' + name;
+    if (!/^models\/[A-Za-z0-9._-]+$/.test(name)) throw new Error('AI_MODEL|Select a valid model.');
+    return name;
+  }
+
+  function buildGenerationRequest(requirement) {
+    return {
+      systemInstruction: {
+        parts: [{ text: AiPrompt.buildFormFlowSystemPrompt() }]
+      },
+      contents: [{
+        role: 'user',
+        parts: [{ text: requirement }]
+      }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.2
+      }
+    };
+  }
+
+  function requestJson(path, request, apiKey) {
+    var options = {
+      method: request.method || 'get',
+      headers: { 'x-goog-api-key': apiKey },
+      muteHttpExceptions: true
+    };
+    if (request.payload) {
+      options.contentType = 'application/json';
+      options.payload = JSON.stringify(request.payload);
+    }
+    var response = UrlFetchApp.fetch(API_BASE + path, options);
+    var status = response.getResponseCode();
+    var text = response.getContentText();
+    var data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      throw new Error('AI_RESPONSE|Gemini returned an unreadable response.');
+    }
+    if (status < 200 || status >= 300) throw buildHttpError(status, data, apiKey);
+    return data;
+  }
+
+  function buildHttpError(status, data, apiKey) {
+    var providerMessage = data && data.error && data.error.message ? data.error.message : 'Request failed.';
+    var safeMessage = sanitizeProviderMessage(providerMessage, apiKey);
+    if (status === 401 || status === 403) return new Error('AI_AUTH|' + safeMessage);
+    if (status === 429) return new Error('AI_QUOTA|' + safeMessage);
+    return new Error('AI_REMOTE|' + safeMessage);
+  }
+
+  function sanitizeProviderMessage(message, apiKey) {
+    return String(message || '')
+      .split(String(apiKey || '')).join('***')
+      .replace(/([?&]key=)[^&\s]+/gi, '$1***')
+      .slice(0, 300);
+  }
+
+  function extractResponseText(response) {
+    var candidates = response && response.candidates ? response.candidates : [];
+    var parts = candidates[0] && candidates[0].content ? candidates[0].content.parts || [] : [];
+    var text = parts.map(function (part) { return part.text || ''; }).join('').trim();
+    if (!text) throw new Error('AI_RESPONSE|Gemini returned no JSON content.');
+    return text;
+  }
+
+  return {
+    getSettings: getSettings,
+    listModels: listModels,
+    saveSettings: saveSettings,
+    clearSettings: clearSettings,
+    generateSpec: generateSpec
+  };
+})();
+
+
+// ===== src/GroqService.gs =====
+var GroqService = (function () {
+  var API_BASE = 'https://api.groq.com/openai/v1';
+  var API_KEY_PROPERTY = 'FORMFLOW_AI_GROQ_API_KEY';
+  var MODEL_PROPERTY = 'FORMFLOW_AI_GROQ_MODEL';
+  var MAX_REQUIREMENT_CHARS = 20000;
+
+  function getSettings() {
+    var props = PropertiesService.getScriptProperties();
+    return {
+      hasApiKey: !!props.getProperty(API_KEY_PROPERTY),
+      model: props.getProperty(MODEL_PROPERTY) || ''
+    };
+  }
+
+  function listModels(apiKey) {
+    var resolvedKey = resolveApiKey(apiKey);
+    var data = requestJson('/models', { method: 'get' }, resolvedKey);
+    return (data.data || [])
+      .filter(isTextGenerationModel)
+      .map(toModelOption)
+      .sort(function (a, b) { return a.label.localeCompare(b.label); });
+  }
+
+  function saveSettings(apiKey, modelName) {
+    var resolvedKey = resolveApiKey(apiKey);
+    var normalizedModel = normalizeModelName(modelName);
+    var models = listModels(resolvedKey);
+    var isAvailable = models.some(function (model) { return model.name === normalizedModel; });
+    if (!isAvailable) throw new Error('AI_MODEL|The selected model is not available for this API key.');
+    PropertiesService.getScriptProperties().setProperties({
+      FORMFLOW_AI_GROQ_API_KEY: resolvedKey,
+      FORMFLOW_AI_GROQ_MODEL: normalizedModel
+    });
+    return getSettings();
+  }
+
+  function clearSettings() {
+    PropertiesService.getScriptProperties().deleteProperty(API_KEY_PROPERTY);
+    PropertiesService.getScriptProperties().deleteProperty(MODEL_PROPERTY);
+    return getSettings();
+  }
+
+  function generateSpec(requirement, modelName) {
+    var prompt = String(requirement || '').trim();
+    if (prompt.length < 5) throw new Error('AI_CONFIG|Please enter a form requirement.');
+    if (prompt.length > MAX_REQUIREMENT_CHARS) throw new Error('AI_CONFIG|The requirement is too long.');
+    var apiKey = resolveApiKey('');
+    var model = normalizeModelName(modelName || getSettings().model);
+    var response = requestJson('/chat/completions', {
+      method: 'post',
+      payload: {
+        model: model,
+        messages: [
+          { role: 'system', content: AiPrompt.buildFormFlowSystemPrompt() },
+          { role: 'user', content: prompt }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.2
+      }
+    }, apiKey);
+    return AiPrompt.validateGeneratedSpec(extractResponseText(response), model);
+  }
+
+  function isTextGenerationModel(model) {
+    var id = String(model && model.id || '').toLowerCase();
+    if (!id || model.active === false) return false;
+    return !/(whisper|speech|audio|tts|guard|safeguard)/.test(id);
+  }
+
+  function toModelOption(model) {
+    var id = normalizeModelName(model.id);
+    var owner = model.owned_by ? 'Owned by ' + model.owned_by : '';
+    return {
+      id: id,
+      name: id,
+      label: id,
+      description: owner,
+      inputTokenLimit: Number(model.context_window || 0),
+      outputTokenLimit: Number(model.max_completion_tokens || 0)
+    };
+  }
+
+  function resolveApiKey(apiKey) {
+    var provided = String(apiKey || '').trim();
+    var resolved = provided || PropertiesService.getScriptProperties().getProperty(API_KEY_PROPERTY) || '';
+    if (resolved.length < 20) throw new Error('AI_CONFIG|A valid Groq API key is required.');
+    return resolved;
+  }
+
+  function normalizeModelName(modelName) {
+    var name = String(modelName || '').trim();
+    if (!/^[A-Za-z0-9._\/-]+$/.test(name) || name.indexOf('..') !== -1) throw new Error('AI_MODEL|Select a valid model.');
+    return name;
+  }
+
+  function requestJson(path, request, apiKey) {
+    var options = {
+      method: request.method || 'get',
+      headers: { Authorization: 'Bearer ' + apiKey },
+      muteHttpExceptions: true
+    };
+    if (request.payload) {
+      options.contentType = 'application/json';
+      options.payload = JSON.stringify(request.payload);
+    }
+    var response = UrlFetchApp.fetch(API_BASE + path, options);
+    var status = response.getResponseCode();
+    var text = response.getContentText();
+    var data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      throw new Error('AI_RESPONSE|Groq returned an unreadable response.');
+    }
+    if (status < 200 || status >= 300) throw buildHttpError(status, data, apiKey);
+    return data;
+  }
+
+  function buildHttpError(status, data, apiKey) {
+    var providerMessage = data && data.error && data.error.message ? data.error.message : 'Request failed.';
+    var safeMessage = sanitizeProviderMessage(providerMessage, apiKey);
+    if (status === 401 || status === 403) return new Error('AI_AUTH|' + safeMessage);
+    if (status === 429) return new Error('AI_QUOTA|' + safeMessage);
+    return new Error('AI_REMOTE|' + safeMessage);
+  }
+
+  function sanitizeProviderMessage(message, apiKey) {
+    return String(message || '')
+      .split(String(apiKey || '')).join('***')
+      .replace(/(Bearer\s+)[^\s]+/gi, '$1***')
+      .slice(0, 300);
+  }
+
+  function extractResponseText(response) {
+    var choices = response && response.choices ? response.choices : [];
+    var text = choices[0] && choices[0].message ? String(choices[0].message.content || '').trim() : '';
+    if (!text) throw new Error('AI_RESPONSE|Groq returned no JSON content.');
+    return text;
+  }
+
+  return {
+    getSettings: getSettings,
+    listModels: listModels,
+    saveSettings: saveSettings,
+    clearSettings: clearSettings,
+    generateSpec: generateSpec
+  };
+})();
+
+
+// ===== src/AiService.gs =====
+var AiService = (function () {
+  var DEFAULT_PROVIDER = 'google-gemini';
+
+  function getProviders() {
+    return [
+      { id: 'google-gemini', label: 'Google Gemini API' },
+      { id: 'groq', label: 'Groq API' }
+    ];
+  }
+
+  function getSettings(providerId) {
+    var selectedProvider = normalizeProviderId(providerId);
+    var settings = getProvider(selectedProvider).getSettings();
+    return {
+      providers: getProviders(),
+      provider: selectedProvider,
+      hasApiKey: settings.hasApiKey,
+      model: settings.model
+    };
+  }
+
+  function listModels(providerId, apiKey) {
+    var selectedProvider = normalizeProviderId(providerId);
+    var provider = getProvider(selectedProvider);
+    return {
+      provider: selectedProvider,
+      models: provider.listModels(apiKey),
+      hasApiKey: provider.getSettings().hasApiKey
+    };
+  }
+
+  function saveSettings(providerId, apiKey, modelName) {
+    var selectedProvider = normalizeProviderId(providerId);
+    var settings = getProvider(selectedProvider).saveSettings(apiKey, modelName);
+    return {
+      provider: selectedProvider,
+      hasApiKey: settings.hasApiKey,
+      model: settings.model
+    };
+  }
+
+  function clearSettings(providerId) {
+    var selectedProvider = normalizeProviderId(providerId);
+    var settings = getProvider(selectedProvider).clearSettings();
+    return {
+      provider: selectedProvider,
+      hasApiKey: settings.hasApiKey,
+      model: settings.model
+    };
+  }
+
+  function generateSpec(providerId, requirement, modelName) {
+    var selectedProvider = normalizeProviderId(providerId);
+    return getProvider(selectedProvider).generateSpec(requirement, modelName);
+  }
+
+  function normalizeProviderId(providerId) {
+    return String(providerId || DEFAULT_PROVIDER);
+  }
+
+  function getProvider(providerId) {
+    if (providerId === 'google-gemini') return GeminiService;
+    if (providerId === 'groq') return GroqService;
+    throw new Error('AI_PROVIDER|Unsupported AI provider.');
+  }
+
+  function toUserMessage(error) {
+    var message = error && error.message ? error.message : String(error || '');
+    var separator = message.indexOf('|');
+    var code = separator === -1 ? 'AI_REMOTE' : message.slice(0, separator);
+    var detail = separator === -1 ? '' : message.slice(separator + 1);
+    if (code === 'AI_AUTH') return 'API Key \u7121\u6548\u3001\u672a\u555f\u7528\uff0c\u6216\u6c92\u6709\u6b0a\u9650\u3002\u8acb\u5230 provider console \u6aa2\u67e5 Key \u8a2d\u5b9a\u3002';
+    if (code === 'AI_QUOTA') return 'API \u984d\u5ea6\u5df2\u7528\u5b8c\u6216\u8acb\u6c42\u904e\u65bc\u983b\u7e41\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002';
+    if (code === 'AI_MODEL') return '\u9078\u64c7\u7684\u6a21\u578b\u7121\u6548\u6216\u4e0d\u652f\u63f4 JSON \u5167\u5bb9\u7522\u751f\u3002';
+    if (code === 'AI_CONFIG') return detail || '\u8acb\u5148\u5b8c\u6210 AI \u8a2d\u5b9a\u3002';
+    if (code === 'AI_RESPONSE') return 'AI provider \u6c92\u6709\u56de\u50b3\u53ef\u7528\u7684 FormFlow JSON\uff0c\u8acb\u8abf\u6574\u9700\u6c42\u5f8c\u91cd\u8a66\u3002';
+    if (code === 'AI_PROVIDER') return '\u76ee\u524d\u53ea\u652f\u63f4 Google Gemini API \u8207 Groq API\u3002';
+    return 'AI provider \u9023\u7dda\u5931\u6557\u3002' + (detail ? ' ' + detail : '');
+  }
+
+  return {
+    getSettings: getSettings,
+    listModels: listModels,
+    saveSettings: saveSettings,
+    clearSettings: clearSettings,
+    generateSpec: generateSpec,
+    toUserMessage: toUserMessage
   };
 })();
 

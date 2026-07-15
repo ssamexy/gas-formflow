@@ -120,6 +120,22 @@ tools/     本地打包與驗證腳本
 
 QR code 會由 Web App 在瀏覽器內使用內嵌的 Nayuki QR Code generator v1.8.0 產生，可直接掃描並下載為 SVG。表單網址不會傳送給外部 QR API。
 
+## v2 AI API
+
+可選擇使用自己的 Google Gemini 或 Groq API Key：
+
+- 依 provider 動態偵測該 Key 可見的文字生成模型。Gemini 會篩選 `generateContent`；Groq 會排除明顯的語音／音訊模型。
+- 從清單選擇模型，將 Key 與模型儲存在自己的 Apps Script `ScriptProperties`。
+- 輸入自然語言需求，直接產生並驗證 FormFlow JSON。
+- Key 不會回傳前端、寫入 log 或放進 API URL；公開 `agent` 模式停用所有 AI 功能。
+
+模型出現在清單中不代表一定具有免費額度；free tier、地區限制與 quota 由 Google 決定。完整設定方式：
+
+- [Gemini API 繁體中文指南](docs/ai-gemini.zh-TW.md)
+- [Gemini API English guide](docs/ai-gemini.en.md)
+- [Groq API 與 ZDR 繁體中文指南](docs/ai-groq.zh-TW.md)
+- [Groq API and ZDR English guide](docs/ai-groq.en.md)
+
 ## AI Agent 驗證
 
 部署成 Web App 後，AI agent 可以用無副作用 endpoint 驗證部署狀態：

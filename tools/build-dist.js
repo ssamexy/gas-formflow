@@ -17,6 +17,10 @@ if (!manifestByMode[mode]) {
 const codeFiles = [
   'src/Code.gs',
   'src/SchemaValidator.gs',
+  'src/AiPrompt.gs',
+  'src/GeminiService.gs',
+  'src/GroqService.gs',
+  'src/AiService.gs',
   'src/FormBuilder.gs',
   'src/SheetBuilder.gs',
   'src/SummaryBuilder.gs',

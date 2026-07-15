@@ -741,7 +741,11 @@ JSON 修復
 
 ---
 
-## LLM API v2 規劃
+## LLM API v2
+
+目前 v2 已提供 Google Gemini 與 Groq BYOK 流程：各 provider 的 Key 分開儲存於 Apps Script Properties、動態偵測模型、選擇模型，以及自然語言需求產生並驗證 JSON spec。Groq provider 相容其 OpenAI-style API，並在文件中說明 ZDR 必須於 Groq Data Controls 明確啟用。provider 邊界保留給後續其他 LLM API。
+
+### 後續規劃
 
 v2 可加入 Bring Your Own API Key。
 

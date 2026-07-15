@@ -6,6 +6,10 @@ const required = [
   'README.md',
   'product-requirements.md',
   'src/Code.gs',
+  'src/AiPrompt.gs',
+  'src/GeminiService.gs',
+  'src/GroqService.gs',
+  'src/AiService.gs',
   'src/FormBuilder.gs',
   'src/SheetBuilder.gs',
   'src/SummaryBuilder.gs',
@@ -21,6 +25,10 @@ const required = [
   'docs/deployment-modes.md',
   'docs/schema-v1.md',
   'docs/chatgpt-prompt.md',
+  'docs/ai-gemini.zh-TW.md',
+  'docs/ai-gemini.en.md',
+  'docs/ai-groq.zh-TW.md',
+  'docs/ai-groq.en.md',
   'docs/install.zh-TW.md',
   'docs/install.en.md',
   'examples/event-registration.json',
@@ -100,7 +108,7 @@ try {
 } catch (error) {
   fail(`dist/Code.gs has JavaScript syntax error: ${error.message}`);
 }
-for (const fn of ['doGet', 'setup', 'apiValidateSpec', 'apiPreviewSpec', 'apiCreateFormFlow']) {
+for (const fn of ['doGet', 'setup', 'apiValidateSpec', 'apiPreviewSpec', 'apiGetAiSettings', 'apiListAiModels', 'apiSaveAiSettings', 'apiClearAiSettings', 'apiGenerateSpecWithAi', 'apiCreateFormFlow']) {
   if (!distCode.includes(`function ${fn}`)) fail(`dist/Code.gs missing ${fn}`);
 }
 for (const fn of publicFunctionBlocklist) {
@@ -108,30 +116,36 @@ for (const fn of publicFunctionBlocklist) {
     fail(`dist/Code.gs exposes unsafe public helper ${fn}; use a private trailing-underscore function`);
   }
 }
-for (const fn of ['apiCreateSmokeTest_', 'apiVerifySmokeResources_', 'setupAgentSmokeToken_', 'createFormFlow_', 'isAgentMode_']) {
+for (const fn of ['apiCreateSmokeTest_', 'apiVerifySmokeResources_', 'setupAgentSmokeToken_', 'runPrivateAiOperation_', 'createFormFlow_', 'isAgentMode_']) {
   if (!distCode.includes(`function ${fn}`)) fail(`dist/Code.gs missing private helper ${fn}`);
 }
 if (!distCode.includes('function setupAgentSmokeToken(token)')) fail('dist/Code.gs missing clasp-run token setup wrapper');
 if (!distCode.includes('Token setup is disabled while running in public agent validation mode')) fail('setupAgentSmokeToken must be disabled in agent mode');
 if (!distCode.includes('公開 AI agent 驗證模式不允許未帶 token 的建立操作')) fail('apiCreateFormFlow must block destructive writes in agent mode');
+if (!distCode.includes('\u516c\u958b AI agent \u9a57\u8b49\u6a21\u5f0f\u4e0d\u63d0\u4f9b API Key \u8207 LLM \u529f\u80fd')) fail('AI APIs must be disabled in agent mode');
+if (!distCode.includes("headers: { 'x-goog-api-key': apiKey }")) fail('Gemini API key must be sent in a header');
+if (distCode.includes('generativelanguage.googleapis.com/v1beta?key=')) fail('Gemini API key must not be sent in a URL');
 if (!distCode.includes('safeCellText')) fail('dist/Code.gs missing spreadsheet formula-injection guard');
 if (distCode.includes('DriveApp.')) fail('dist/Code.gs should not require broad DriveApp access');
 const distHtml = fs.existsSync(path.join(root, 'dist/Index.html')) ? fs.readFileSync(path.join(root, 'dist/Index.html'), 'utf8') : '';
-for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e', 'qrcodegen.QrCode.encodeText', 'white-space: pre-wrap']) {
+for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e', 'qrcodegen.QrCode.encodeText', 'white-space: pre-wrap', 'detectAiModels', 'generateJsonWithAi']) {
   if (!distHtml.includes(helper)) fail(`dist/Index.html missing ${helper}`);
 }
 if (distHtml.includes("<?!= include('QrCodeLibrary') ?>")) fail('dist/Index.html must inline the QR library');
 if (distHtml.includes('renderQrPlaceholder') || distHtml.includes('QR placeholder')) fail('dist/Index.html must not contain the QR placeholder');
+verifyInlineScripts(distHtml);
 verifyQrEncoder();
 verifyFormDescriptions();
+verifyAiServices();
+verifyGroqServices();
 
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'dist/appsscript.json'), 'utf8'));
 const privateManifest = JSON.parse(fs.readFileSync(path.join(root, 'config/appsscript.private.json'), 'utf8'));
 const agentManifest = JSON.parse(fs.readFileSync(path.join(root, 'config/appsscript.agent.json'), 'utf8'));
-validateManifest('config/appsscript.private.json', privateManifest, { access: 'MYSELF', executeAs: 'USER_DEPLOYING' });
-validateManifest('config/appsscript.agent.json', agentManifest, { access: 'ANYONE', executeAs: 'USER_DEPLOYING' });
-if (manifest.webapp?.access === 'MYSELF') validateManifest('dist/appsscript.json', manifest, { access: 'MYSELF', executeAs: 'USER_DEPLOYING' });
-else if (manifest.webapp?.access === 'ANYONE') validateManifest('dist/appsscript.json', manifest, { access: 'ANYONE', executeAs: 'USER_DEPLOYING' });
+validateManifest('config/appsscript.private.json', privateManifest, { access: 'MYSELF', executeAs: 'USER_DEPLOYING', externalRequest: true });
+validateManifest('config/appsscript.agent.json', agentManifest, { access: 'ANYONE', executeAs: 'USER_DEPLOYING', externalRequest: false });
+if (manifest.webapp?.access === 'MYSELF') validateManifest('dist/appsscript.json', manifest, { access: 'MYSELF', executeAs: 'USER_DEPLOYING', externalRequest: true });
+else if (manifest.webapp?.access === 'ANYONE') validateManifest('dist/appsscript.json', manifest, { access: 'ANYONE', executeAs: 'USER_DEPLOYING', externalRequest: false });
 else fail('dist/appsscript.json webapp.access must be MYSELF or ANYONE');
 
 const invalidFixtures = [
@@ -233,6 +247,18 @@ function safeCellTextLikeGas(value) {
   return /^[=+\-@]/.test(text) ? `'${text}` : text;
 }
 
+function verifyInlineScripts(html) {
+  const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1]);
+  if (scripts.length < 2) fail('dist/Index.html should contain the QR library and UI scripts');
+  scripts.forEach((script, index) => {
+    try {
+      new Function(script);
+    } catch (error) {
+      fail(`dist/Index.html script ${index + 1} has JavaScript syntax error: ${error.message}`);
+    }
+  });
+}
+
 function verifyQrEncoder() {
   const qrLibrary = fs.readFileSync(path.join(root, 'src/QrCodeLibrary.html'), 'utf8');
   const qrcodegen = new Function(`${qrLibrary}; return qrcodegen;`)();
@@ -270,10 +296,142 @@ function verifyFormDescriptions() {
   if (preview.items[0].helpText !== spec.items[0].description || itemState.helpText !== spec.items[0].description) fail('item description alias was not applied as help text');
 }
 
+function verifyAiServices() {
+  const TEST_AI_KEY = 'test-api-key-1234567890';
+  const aiPromptSource = fs.readFileSync(path.join(root, 'src/AiPrompt.gs'), 'utf8');
+  const geminiSource = fs.readFileSync(path.join(root, 'src/GeminiService.gs'), 'utf8');
+  const groqSource = fs.readFileSync(path.join(root, 'src/GroqService.gs'), 'utf8');
+  const aiSource = fs.readFileSync(path.join(root, 'src/AiService.gs'), 'utf8');
+  const schemaSource = fs.readFileSync(path.join(root, 'src/SchemaValidator.gs'), 'utf8');
+  const SchemaValidator = new Function(`${schemaSource}; return SchemaValidator;`)();
+  const properties = {};
+  const propertyStore = {
+    getProperty(key) { return properties[key] || null; },
+    setProperties(values) { Object.assign(properties, values); },
+    deleteProperty(key) { delete properties[key]; }
+  };
+  const requests = [];
+  let authFailure = false;
+  const generatedSpec = {
+    schemaVersion: '1.0',
+    title: 'AI generated form',
+    description: 'Generated description',
+    items: [{ key: 'name', type: 'shortText', title: 'Name', required: true }]
+  };
+  const UrlFetchApp = {
+    fetch(url, options) {
+      requests.push({ url, options });
+      if (authFailure) return mockHttpResponse(403, { error: { message: `Denied ${TEST_AI_KEY}` } });
+      if (url.includes(':generateContent')) {
+        return mockHttpResponse(200, { candidates: [{ content: { parts: [{ text: JSON.stringify(generatedSpec) }] } }] });
+      }
+      return mockHttpResponse(200, {
+        models: [
+          { name: 'models/gemini-test-flash', displayName: 'Gemini Test Flash', inputTokenLimit: 1000, outputTokenLimit: 500, supportedGenerationMethods: ['generateContent'] },
+          { name: 'models/embedding-test', displayName: 'Embedding Test', supportedGenerationMethods: ['embedContent'] }
+        ]
+      });
+    }
+  };
+  const PropertiesService = { getScriptProperties() { return propertyStore; } };
+  const services = new Function('UrlFetchApp', 'PropertiesService', 'SchemaValidator', `${aiPromptSource}\n${geminiSource}\n${groqSource}\n${aiSource}; return { AiService, GeminiService };`)(UrlFetchApp, PropertiesService, SchemaValidator);
+  if (services.AiService.getSettings('groq').provider !== 'groq') fail('AI provider registry must support Groq');
+  const modelsResult = services.AiService.listModels('google-gemini', TEST_AI_KEY);
+  if (modelsResult.models.length !== 1 || modelsResult.models[0].name !== 'models/gemini-test-flash') fail('AI model list must include only generateContent models');
+  if (requests[0].url.includes(TEST_AI_KEY) || requests[0].options.headers['x-goog-api-key'] !== TEST_AI_KEY) fail('AI key must be sent only in the x-goog-api-key header');
+  const saved = services.AiService.saveSettings('google-gemini', TEST_AI_KEY, 'models/gemini-test-flash');
+  if (!saved.hasApiKey || JSON.stringify(saved).includes(TEST_AI_KEY)) fail('AI settings response must confirm but never reveal the API key');
+  const generated = services.AiService.generateSpec('google-gemini', 'Create a registration form', 'models/gemini-test-flash');
+  if (generated.ok === false || JSON.parse(generated.jsonText).title !== generatedSpec.title) fail('AI generation must return validated FormFlow JSON');
+  const generationRequest = requests.find((request) => request.url.includes(':generateContent'));
+  const generationPayload = generationRequest ? JSON.parse(generationRequest.options.payload) : {};
+  if (generationPayload.generationConfig?.responseMimeType !== 'application/json') fail('AI generation must request JSON output');
+  authFailure = true;
+  try {
+    services.AiService.listModels('google-gemini', TEST_AI_KEY);
+    fail('AI auth failure fixture should throw');
+  } catch (error) {
+    const userMessage = services.AiService.toUserMessage(error);
+    if (userMessage.includes(TEST_AI_KEY) || error.message.includes(TEST_AI_KEY)) fail('AI errors must redact the API key');
+  }
+  services.AiService.clearSettings('google-gemini');
+  if (properties.FORMFLOW_AI_GOOGLE_API_KEY || properties.FORMFLOW_AI_GOOGLE_MODEL) fail('AI clear settings must remove key and model');
+}
+
+
+function verifyGroqServices() {
+  const TEST_GROQ_KEY = 'test-groq-api-key-1234567890';
+  const aiPromptSource = fs.readFileSync(path.join(root, 'src/AiPrompt.gs'), 'utf8');
+  const groqSource = fs.readFileSync(path.join(root, 'src/GroqService.gs'), 'utf8');
+  const aiSource = fs.readFileSync(path.join(root, 'src/AiService.gs'), 'utf8');
+  const schemaSource = fs.readFileSync(path.join(root, 'src/SchemaValidator.gs'), 'utf8');
+  const SchemaValidator = new Function(`${schemaSource}; return SchemaValidator;`)();
+  const properties = {};
+  const propertyStore = {
+    getProperty(key) { return properties[key] || null; },
+    setProperties(values) { Object.assign(properties, values); },
+    deleteProperty(key) { delete properties[key]; }
+  };
+  const requests = [];
+  let authFailure = false;
+  const generatedSpec = {
+    schemaVersion: '1.0',
+    title: 'Groq generated form',
+    items: [{ key: 'email', type: 'shortText', title: 'Email', required: true }]
+  };
+  const UrlFetchApp = {
+    fetch(url, options) {
+      requests.push({ url, options });
+      if (authFailure) return mockHttpResponse(401, { error: { message: `Denied ${TEST_GROQ_KEY}` } });
+      if (url.endsWith('/chat/completions')) {
+        return mockHttpResponse(200, { choices: [{ message: { content: JSON.stringify(generatedSpec) } }] });
+      }
+      return mockHttpResponse(200, {
+        data: [
+          { id: 'llama-test-chat', active: true, owned_by: 'Meta', context_window: 8192, max_completion_tokens: 2048 },
+          { id: 'whisper-test-audio', active: true, owned_by: 'OpenAI', context_window: 448 },
+          { id: 'safeguard-test-model', active: true, owned_by: 'OpenAI', context_window: 8192 }
+        ]
+      });
+    }
+  };
+  const PropertiesService = { getScriptProperties() { return propertyStore; } };
+  const services = new Function('UrlFetchApp', 'PropertiesService', 'SchemaValidator', `${aiPromptSource}\n${groqSource}\n${aiSource}; return { AiService, GroqService };`)(UrlFetchApp, PropertiesService, SchemaValidator);
+  const modelsResult = services.AiService.listModels('groq', TEST_GROQ_KEY);
+  if (modelsResult.models.length !== 1 || modelsResult.models[0].name !== 'llama-test-chat') fail('Groq model list must exclude non-text models');
+  if (requests[0].url.includes(TEST_GROQ_KEY) || requests[0].options.headers.Authorization !== `Bearer ${TEST_GROQ_KEY}`) fail('Groq key must be sent only in the Authorization header');
+  const saved = services.AiService.saveSettings('groq', TEST_GROQ_KEY, 'llama-test-chat');
+  if (!saved.hasApiKey || JSON.stringify(saved).includes(TEST_GROQ_KEY)) fail('Groq settings response must never reveal the API key');
+  const generated = services.AiService.generateSpec('groq', 'Create a feedback form', 'llama-test-chat');
+  if (generated.ok === false || JSON.parse(generated.jsonText).title !== generatedSpec.title) fail('Groq generation must return validated FormFlow JSON');
+  const generationRequest = requests.find((request) => request.url.endsWith('/chat/completions'));
+  const payload = generationRequest ? JSON.parse(generationRequest.options.payload) : {};
+  if (payload.response_format?.type !== 'json_object') fail('Groq generation must request JSON Object Mode');
+  authFailure = true;
+  try {
+    services.AiService.listModels('groq', TEST_GROQ_KEY);
+    fail('Groq auth failure fixture should throw');
+  } catch (error) {
+    const userMessage = services.AiService.toUserMessage(error);
+    if (userMessage.includes(TEST_GROQ_KEY) || error.message.includes(TEST_GROQ_KEY)) fail('Groq errors must redact the API key');
+  }
+  services.AiService.clearSettings('groq');
+  if (properties.FORMFLOW_AI_GROQ_API_KEY || properties.FORMFLOW_AI_GROQ_MODEL) fail('Groq clear settings must remove key and model');
+}
+
+function mockHttpResponse(status, body) {
+  return {
+    getResponseCode() { return status; },
+    getContentText() { return JSON.stringify(body); }
+  };
+}
+
 function validateManifest(label, manifestToCheck, expected) {
   if (manifestToCheck.webapp?.access !== expected.access) fail(`${label} webapp.access must be ${expected.access}`);
   if (manifestToCheck.webapp?.executeAs !== expected.executeAs) fail(`${label} webapp.executeAs must be ${expected.executeAs}`);
   if ((manifestToCheck.oauthScopes || []).includes('https://www.googleapis.com/auth/drive')) fail(`${label} should avoid broad Drive scope`);
+  const hasExternalRequest = (manifestToCheck.oauthScopes || []).includes('https://www.googleapis.com/auth/script.external_request');
+  if (hasExternalRequest !== expected.externalRequest) fail(`${label} external request scope must be ${expected.externalRequest}`);
 }
 
 if (failed) process.exit(1);

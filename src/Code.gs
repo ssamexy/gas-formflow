@@ -38,7 +38,7 @@ function doGet(e) {
   }
   if (e && e.parameter && e.parameter.mode === 'health') {
     return ContentService
-      .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.1.0' }))
+      .createTextOutput(JSON.stringify({ ok: true, app: 'GAS FormFlow', version: '0.2.0' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
   return HtmlService.createTemplateFromFile('Index').evaluate()
@@ -89,6 +89,56 @@ function apiPreviewSpec(jsonText) {
     form: FormBuilder.preview(validation.spec),
     sheet: SheetBuilder.preview(validation.spec)
   };
+}
+
+function apiGetAiSettings(providerId) {
+  return runPrivateAiOperation_(function () {
+    return AiService.getSettings(providerId);
+  });
+}
+
+function apiListAiModels(providerId, apiKey) {
+  return runPrivateAiOperation_(function () {
+    return AiService.listModels(providerId, apiKey);
+  });
+}
+
+function apiSaveAiSettings(providerId, apiKey, modelName) {
+  return runPrivateAiOperation_(function () {
+    return AiService.saveSettings(providerId, apiKey, modelName);
+  });
+}
+
+function apiClearAiSettings(providerId) {
+  return runPrivateAiOperation_(function () {
+    return AiService.clearSettings(providerId);
+  });
+}
+
+function apiGenerateSpecWithAi(providerId, requirement, modelName) {
+  return runPrivateAiOperation_(function () {
+    return AiService.generateSpec(providerId, requirement, modelName);
+  });
+}
+
+function runPrivateAiOperation_(operation) {
+  if (isAgentMode_()) {
+    return {
+      ok: false,
+      errors: ['公開 AI agent 驗證模式不提供 API Key 與 LLM 功能。請切回 private deployment。']
+    };
+  }
+  try {
+    var result = operation() || {};
+    if (result.ok === false) return result;
+    result.ok = true;
+    return result;
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [AiService.toUserMessage(error)]
+    };
+  }
 }
 
 function apiCreateFormFlow(jsonText) {
@@ -178,7 +228,7 @@ function apiSelfTest() {
   return {
     ok: allPassed,
     app: 'GAS FormFlow',
-    version: '0.1.0',
+    version: '0.2.0',
     startedAt: startedAt,
     finishedAt: new Date().toISOString(),
     sideEffects: 'none',

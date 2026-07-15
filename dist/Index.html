@@ -48,7 +48,7 @@
       padding: 14px;
     }
     .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-    button, select {
+    button, select, input {
       min-height: 40px;
       border: 1px solid var(--line);
       border-radius: 6px;
@@ -92,6 +92,21 @@
       margin: 8px 0;
     }
     .qr svg { display: block; width: 100%; height: 100%; padding: 12px; }
+    .ai-panel {
+      margin: 0 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fbfcfa;
+    }
+    .ai-panel summary { cursor: pointer; font-weight: 700; }
+    .ai-panel .hint { margin: 8px 0; color: var(--muted); font-size: 13px; }
+    .ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .field { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
+    .field input, .field select { width: 100%; }
+    .field.full { grid-column: 1 / -1; }
+    textarea.ai-prompt { min-height: 120px; font-family: inherit; }
+    .ai-status, .model-info { display: block; margin-top: 8px; color: var(--muted); white-space: pre-wrap; }
     .copybox {
       width: 100%;
       min-height: 150px;
@@ -105,6 +120,9 @@
     @media (max-width: 840px) {
       .grid { grid-template-columns: 1fr; }
       textarea { min-height: 46vh; }
+      .ai-grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      textarea.ai-prompt { min-height: 120px; }
       header { position: static; }
     }
   </style>
@@ -131,6 +149,38 @@
           <button id="previewBtn" data-testid="preview-button">預覽</button>
           <button id="createBtn" data-testid="create-button" class="primary">建立表單</button>
         </div>
+        <details class="ai-panel" open>
+          <summary>AI 產生 JSON（v2）</summary>
+          <p class="hint">選擇 AI provider，輸入自己的 API Key 並偵測可用模型。每個 provider 的 Key 與模型會分開儲存在你的 Apps Script Properties，不會顯示或回傳。</p>
+          <small id="aiProviderInfo" class="model-info"></small>
+          <div class="ai-grid">
+            <label class="field">API Provider
+              <select id="aiProvider" data-testid="ai-provider">
+                <option value="google-gemini">Google Gemini API</option>
+                <option value="groq">Groq API</option>
+              </select>
+            </label>
+            <label class="field">API Key
+              <input id="aiApiKey" data-testid="ai-api-key" type="password" autocomplete="new-password" placeholder="貼上新的 Key，或留空使用已儲存的 Key">
+            </label>
+            <label class="field full">支援的模型
+              <select id="aiModel" data-testid="ai-model" disabled>
+                <option value="">請先偵測模型</option>
+              </select>
+            </label>
+            <label class="field full">描述你想建立的表單
+              <textarea id="aiRequirement" data-testid="ai-requirement" class="ai-prompt" placeholder="例如：建立一份 30 人活動報名表，收集姓名、電話、餐點與交通需求，並方便統計。"></textarea>
+            </label>
+          </div>
+          <div class="toolbar">
+            <button id="aiDetectBtn" data-testid="ai-detect-models">偵測支援模型</button>
+            <button id="aiSaveBtn" data-testid="ai-save-settings">儲存 Key 與模型</button>
+            <button id="aiGenerateBtn" data-testid="ai-generate-json" class="primary">AI 產生 JSON</button>
+            <button id="aiClearBtn" data-testid="ai-clear-settings">清除 AI 設定</button>
+          </div>
+          <small id="aiStatus" data-testid="ai-status" class="ai-status">正在讀取 AI 設定...</small>
+          <small id="aiModelInfo" class="model-info"></small>
+        </details>
         <textarea id="jsonInput" data-testid="json-input" spellcheck="false" aria-label="JSON 輸入"></textarea>
         <div id="status" data-testid="status" class="status">請貼上 GAS FormFlow v1 JSON，或先載入範例。</div>
       </section>
@@ -1047,7 +1097,17 @@ var qrcodegen;
     const statusEl = document.getElementById('status');
     const previewEl = document.getElementById('preview');
     const resultEl = document.getElementById('result');
-    const buttons = [...document.querySelectorAll('button, select')];
+    const aiProviderEl = document.getElementById('aiProvider');
+    const aiApiKeyEl = document.getElementById('aiApiKey');
+    const aiModelEl = document.getElementById('aiModel');
+    const aiRequirementEl = document.getElementById('aiRequirement');
+    const aiStatusEl = document.getElementById('aiStatus');
+    const aiProviderInfoEl = document.getElementById('aiProviderInfo');
+    const aiModelInfoEl = document.getElementById('aiModelInfo');
+    const buttons = [...document.querySelectorAll('button, select, input')];
+    let detectedAiModels = [];
+    let hasStoredAiKey = false;
+    let savedAiModel = '';
 
     document.getElementById('exampleSelect').addEventListener('change', (event) => {
       const spec = examples[event.target.value];
@@ -1060,6 +1120,12 @@ var qrcodegen;
     document.getElementById('validateBtn').addEventListener('click', validateSpec);
     document.getElementById('previewBtn').addEventListener('click', previewSpec);
     document.getElementById('createBtn').addEventListener('click', createFlow);
+    document.getElementById('aiDetectBtn').addEventListener('click', detectAiModels);
+    document.getElementById('aiSaveBtn').addEventListener('click', saveAiSettings);
+    document.getElementById('aiGenerateBtn').addEventListener('click', generateJsonWithAi);
+    document.getElementById('aiClearBtn').addEventListener('click', clearAiSettings);
+    aiProviderEl.addEventListener('change', switchAiProvider);
+    aiModelEl.addEventListener('change', renderAiModelInfo);
     input.value = JSON.stringify(examples.event, null, 2);
     window.__e2e = {
       getExampleKeys: () => Object.keys(examples),
@@ -1072,6 +1138,160 @@ var qrcodegen;
         return true;
       }
     };
+    updateProviderInfo();
+    loadAiSettings();
+
+    function switchAiProvider() {
+      aiApiKeyEl.value = '';
+      hasStoredAiKey = false;
+      savedAiModel = '';
+      detectedAiModels = [];
+      populateAiModels([], '');
+      updateProviderInfo();
+      loadAiSettings();
+    }
+
+    function updateProviderInfo() {
+      aiProviderInfoEl.textContent = aiProviderEl.value === 'groq'
+        ? 'Groq：推論資料預設不保留；完整 ZDR 需在 Groq Data Controls 啟用，usage metadata 仍會保留。'
+        : 'Gemini：模型清單會依目前 Key 動態取得；實際 free tier 與 quota 由 Google 決定。';
+      aiApiKeyEl.placeholder = aiProviderEl.value === 'groq'
+        ? '貼上 Groq Key，或留空使用已儲存的 Key'
+        : '貼上 Gemini Key，或留空使用已儲存的 Key';
+    }
+
+    function loadAiSettings() {
+      run('apiGetAiSettings', [aiProviderEl.value], (res) => {
+        if (!res.ok) {
+          setAiStatus((res.errors || ['無法讀取 AI 設定。']).join('\n'), true);
+          return;
+        }
+        hasStoredAiKey = !!res.hasApiKey;
+        savedAiModel = res.model || '';
+        if (savedAiModel) populateAiModels([{ name: savedAiModel, label: savedAiModel.replace(/^models\//, ''), description: '', inputTokenLimit: 0, outputTokenLimit: 0 }], savedAiModel);
+        setAiStatus(hasStoredAiKey ? `${getProviderLabel()} 已儲存 API Key。可偵測最新模型列表，或直接使用已選模型。` : `${getProviderLabel()} 尚未儲存 API Key。請貼上 Key 後偵測模型。`, false);
+      });
+    }
+
+    function detectAiModels() {
+      const apiKey = aiApiKeyEl.value.trim();
+      if (!apiKey && !hasStoredAiKey) {
+        setAiStatus(`請先輸入 ${getProviderLabel()} API Key。`, true);
+        return;
+      }
+      setAiStatus(`正在向 ${getProviderLabel()} 偵測可用模型...`, false);
+      run('apiListAiModels', [aiProviderEl.value, apiKey], (res) => {
+        if (!res.ok) {
+          setAiStatus((res.errors || ['模型偵測失敗。']).join('\n'), true);
+          return;
+        }
+        detectedAiModels = res.models || [];
+        populateAiModels(detectedAiModels, savedAiModel);
+        setAiStatus(`偵測到 ${detectedAiModels.length} 個可用的文字生成模型。請選擇後儲存設定。`, detectedAiModels.length === 0);
+      });
+    }
+
+    function populateAiModels(models, selectedModel) {
+      aiModelEl.replaceChildren();
+      if (!models.length) {
+        aiModelEl.append(new Option('沒有可用模型', ''));
+        aiModelEl.disabled = true;
+        renderAiModelInfo();
+        return;
+      }
+      models.forEach((model) => {
+        const tokens = model.outputTokenLimit ? ` · output ${model.outputTokenLimit.toLocaleString()} tokens` : '';
+        aiModelEl.append(new Option(`${model.label}${tokens}`, model.name));
+      });
+      aiModelEl.disabled = false;
+      if (selectedModel && models.some((model) => model.name === selectedModel)) aiModelEl.value = selectedModel;
+      renderAiModelInfo();
+    }
+
+    function renderAiModelInfo() {
+      const selected = detectedAiModels.find((model) => model.name === aiModelEl.value);
+      if (!selected) {
+        aiModelInfoEl.textContent = aiModelEl.value ? `目前模型：${aiModelEl.value.replace(/^models\//, '')}` : '';
+        return;
+      }
+      const limits = [
+        selected.inputTokenLimit ? `輸入上限 ${selected.inputTokenLimit.toLocaleString()}` : '',
+        selected.outputTokenLimit ? `輸出上限 ${selected.outputTokenLimit.toLocaleString()}` : ''
+      ].filter(Boolean).join('；');
+      aiModelInfoEl.textContent = [selected.description, limits].filter(Boolean).join('\n');
+    }
+
+    function saveAiSettings() {
+      if (!aiModelEl.value) {
+        setAiStatus('請先偵測並選擇模型。', true);
+        return;
+      }
+      run('apiSaveAiSettings', [aiProviderEl.value, aiApiKeyEl.value.trim(), aiModelEl.value], (res) => {
+        if (!res.ok) {
+          setAiStatus((res.errors || ['AI 設定儲存失敗。']).join('\n'), true);
+          return;
+        }
+        aiApiKeyEl.value = '';
+        hasStoredAiKey = true;
+        savedAiModel = res.model || aiModelEl.value;
+        setAiStatus(`${getProviderLabel()} API Key 與模型已安全儲存。使用模型：${savedAiModel.replace(/^models\//, '')}`, false);
+      });
+    }
+
+    function clearAiSettings() {
+      if (!confirm('確定要從 Apps Script Properties 清除已儲存的 API Key 與模型？')) return;
+      run('apiClearAiSettings', [aiProviderEl.value], (res) => {
+        if (!res.ok) {
+          setAiStatus((res.errors || ['AI 設定清除失敗。']).join('\n'), true);
+          return;
+        }
+        aiApiKeyEl.value = '';
+        hasStoredAiKey = false;
+        savedAiModel = '';
+        detectedAiModels = [];
+        populateAiModels([], '');
+        setAiStatus('AI 設定已清除。', false);
+      });
+    }
+
+    function generateJsonWithAi() {
+      const requirement = aiRequirementEl.value.trim();
+      if (!hasStoredAiKey) {
+        setAiStatus('請先儲存 API Key 與模型。', true);
+        return;
+      }
+      if (!aiModelEl.value) {
+        setAiStatus('請先選擇模型。', true);
+        return;
+      }
+      if (requirement.length < 5) {
+        setAiStatus('請更完整地描述想建立的表單。', true);
+        return;
+      }
+      setAiStatus(`${getProviderLabel()} 正在產生並驗證 FormFlow JSON...`, false);
+      run('apiGenerateSpecWithAi', [aiProviderEl.value, requirement, aiModelEl.value], (res) => {
+        if (res.jsonText) {
+          input.value = res.jsonText;
+          previewEl.innerHTML = '';
+          resultEl.innerHTML = '';
+        }
+        if (!res.ok) {
+          setAiStatus((res.errors || ['AI 產生失敗。']).join('\n'), true);
+          return;
+        }
+        setAiStatus(`JSON 已產生並通過驗證。模型：${String(res.model || '').replace(/^models\//, '')}`, false);
+        setStatus('AI 已產生 JSON，可以按「預覽」檢查。', 'ok');
+      });
+    }
+
+    function getProviderLabel() {
+      return aiProviderEl.options[aiProviderEl.selectedIndex]?.text || aiProviderEl.value;
+    }
+
+    function setAiStatus(message, isError) {
+      aiStatusEl.textContent = message;
+      aiStatusEl.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+    }
 
     function validateSpec() {
       run('apiValidateSpec', [input.value], (res) => {

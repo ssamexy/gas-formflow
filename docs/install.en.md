@@ -38,3 +38,7 @@ During the first authorization, Google may show an unverified app warning. This 
 4. Click Preview.
 5. Click Create form.
 6. Copy the form URL, announcement text, and QR code as needed.
+
+## Optional: Gemini or Groq API
+
+After updating to v2, run authorization again and allow Apps Script to make external HTTPS requests. Then select a provider in "AI JSON generation (v2)", paste your own key, detect models, and save a selection. See the [Gemini API guide](ai-gemini.en.md) and [Groq/ZDR guide](ai-groq.en.md).

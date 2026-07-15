@@ -38,3 +38,7 @@
 4. 按「預覽」檢查表單與 Sheet 結構。
 5. 按「建立表單」。
 6. 複製填寫連結、公告文案，並視需要使用 QR code。
+
+## 選用：Gemini 或 Groq API
+
+更新到 v2 後請重新執行授權，允許 Apps Script 使用外部 HTTPS 請求。接著可在 Web App 的「AI 產生 JSON（v2）」選擇 provider、貼上自己的 Key、偵測模型並儲存。詳見 [Gemini API 指南](ai-gemini.zh-TW.md)與 [Groq/ZDR 指南](ai-groq.zh-TW.md)。
