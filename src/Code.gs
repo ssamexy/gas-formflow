@@ -42,8 +42,7 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
   return HtmlService.createTemplateFromFile('Index').evaluate()
-    .setTitle('GAS FormFlow')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    .setTitle('GAS FormFlow');
 }
 
 function include(filename) {
