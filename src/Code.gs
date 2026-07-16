@@ -145,6 +145,12 @@ function apiGenerateSpecWithAi(providerId, requirement, modelName) {
   });
 }
 
+function apiRunAiProviderSmoke(providerId) {
+  return runPrivateAiOperation_(function () {
+    return AiService.runProviderSmoke(providerId);
+  });
+}
+
 function runPrivateAiOperation_(operation) {
   if (isAgentMode_()) {
     return {

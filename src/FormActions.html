@@ -1,0 +1,50 @@
+<script>
+    function validateSpec() {
+      run('apiValidateSpec', [input.value], (res) => {
+        if (res.ok) setStatus('JSON 驗證通過。', 'ok');
+        else setStatus(res.errors.join('\n'), 'error');
+      });
+    }
+
+    function previewSpec() {
+      run('apiPreviewSpec', [input.value], (res) => {
+        if (!res.ok) {
+          setStatus(res.errors.join('\n'), 'error');
+          return;
+        }
+        setStatus('預覽已更新。', 'ok');
+        renderPreview(res);
+      });
+    }
+
+    function requestCreateFlow() {
+      openConfirmation({
+        title: '建立 Google Form 與 Sheet？',
+        message: '這會在你的 Google 帳號建立新的表單與回應試算表。建立前請確認右側預覽與 JSON 內容。',
+        confirmLabel: '確認建立',
+        onConfirm: createFlow
+      });
+    }
+
+    function createFlow() {
+      setStatus('正在建立，請不要關閉視窗...', '');
+      run('apiCreateFormFlow', [input.value], (res) => {
+        if (!res.ok) {
+          setStatus((res.errors || ['建立失敗']).join('\n'), 'error');
+          return;
+        }
+        setStatus('建立完成。', 'ok');
+        renderResult(res);
+      });
+    }
+
+    function run(fn, args, onSuccess) {
+      setBusy(true);
+      google.script.run
+        .withSuccessHandler((res) => { setBusy(false); onSuccess(res); })
+        .withFailureHandler((error) => {
+          setBusy(false);
+          setStatus('操作失敗：' + (error && error.message ? error.message : error), 'error');
+        })[fn](...args);
+    }
+</script>

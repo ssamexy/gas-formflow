@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
 const required = [
@@ -17,6 +18,16 @@ const required = [
   'src/QrCodeBuilder.gs',
   'src/QrCodeLibrary.html',
   'src/Index.html',
+  'src/StylesBase.html',
+  'src/StylesWorkspace.html',
+  'src/StylesResponsive.html',
+  'src/AppState.html',
+  'src/AppCore.html',
+  'src/AiSettings.html',
+  'src/AiDiscussion.html',
+  'src/FormActions.html',
+  'src/FormRendering.html',
+  'src/AppBootstrap.html',
   'dist/Code.gs',
   'dist/Index.html',
   'dist/appsscript.json',
@@ -108,7 +119,7 @@ try {
 } catch (error) {
   fail(`dist/Code.gs has JavaScript syntax error: ${error.message}`);
 }
-for (const fn of ['doGet', 'setup', 'apiValidateSpec', 'apiPreviewSpec', 'apiGetAiSettings', 'apiListAiModels', 'apiSaveAiKey', 'apiSaveAiModel', 'apiSaveAiSettings', 'apiDiscussFormWithAi', 'apiGenerateSpecFromOutline', 'apiClearAiSettings', 'apiGenerateSpecWithAi', 'apiCreateFormFlow']) {
+for (const fn of ['doGet', 'setup', 'apiValidateSpec', 'apiPreviewSpec', 'apiGetAiSettings', 'apiListAiModels', 'apiSaveAiKey', 'apiSaveAiModel', 'apiSaveAiSettings', 'apiDiscussFormWithAi', 'apiGenerateSpecFromOutline', 'apiClearAiSettings', 'apiGenerateSpecWithAi', 'apiRunAiProviderSmoke', 'apiCreateFormFlow']) {
   if (!distCode.includes(`function ${fn}`)) fail(`dist/Code.gs missing ${fn}`);
 }
 for (const fn of publicFunctionBlocklist) {
@@ -125,9 +136,20 @@ if (!distCode.includes('公開 AI agent 驗證模式不允許未帶 token 的建
 if (!distCode.includes('\u516c\u958b AI agent \u9a57\u8b49\u6a21\u5f0f\u4e0d\u63d0\u4f9b API Key \u8207 LLM \u529f\u80fd')) fail('AI APIs must be disabled in agent mode');
 if (!distCode.includes("headers: { 'x-goog-api-key': apiKey }")) fail('Gemini API key must be sent in a header');
 if (distCode.includes('generativelanguage.googleapis.com/v1beta?key=')) fail('Gemini API key must not be sent in a URL');
+if (!distCode.includes('discussionOk: true') || !distCode.includes('generationOk: true')) fail('AI provider smoke must verify discussion and JSON generation without returning secrets');
 if (!distCode.includes('safeCellText')) fail('dist/Code.gs missing spreadsheet formula-injection guard');
 if (distCode.includes('DriveApp.')) fail('dist/Code.gs should not require broad DriveApp access');
 const distHtml = fs.existsSync(path.join(root, 'dist/Index.html')) ? fs.readFileSync(path.join(root, 'dist/Index.html'), 'utf8') : '';
+const frontendModules = ['src/Index.html', 'src/StylesBase.html', 'src/StylesWorkspace.html', 'src/StylesResponsive.html', 'src/AppState.html', 'src/AppCore.html', 'src/AiSettings.html', 'src/AiDiscussion.html', 'src/FormActions.html', 'src/FormRendering.html', 'src/AppBootstrap.html'];
+for (const file of frontendModules) {
+  const source = fs.existsSync(path.join(root, file)) ? fs.readFileSync(path.join(root, file), 'utf8') : '';
+  if (source.split(/\r?\n/).length > 800) fail(`${file} exceeds the 800-line maintainability limit`);
+  if (/\?{4,}/.test(source)) fail(`${file} contains likely encoding replacement characters`);
+}
+for (const includeName of ['StylesBase', 'StylesWorkspace', 'StylesResponsive', 'AppState', 'AppCore', 'AiSettings', 'AiDiscussion', 'FormActions', 'FormRendering', 'AppBootstrap']) {
+  if (!fs.readFileSync(path.join(root, 'src/Index.html'), 'utf8').includes(`include('${includeName}')`)) fail(`src/Index.html missing ${includeName} module include`);
+}
+if (/<\?!=\s*include\(/.test(distHtml)) fail('dist/Index.html must inline every source module');
 for (const helper of ['escapeHtml', 'escapeAttr', 'window.__e2e', 'qrcodegen.QrCode.encodeText', 'white-space: pre-wrap', 'detectAiModels', 'saveAiKey', 'sendAiChat', 'handleChatKeydown', 'updateChatSendState', 'showChatThinking', 'openConfirmation', 'approveOutlineAndGenerateJson', 'ai-settings-dialog', 'setup-empty-state', 'starter-prompts', 'jsonPanel', 'ai-chat-log', 'chat-composer', 'ai-approve-outline', 'copySelectedExample', 'writeClipboardText', 'copy-example-button', 'example-template-note', 'google-form-preview', 'renderGoogleFormControl']) {
   if (!distHtml.includes(helper)) fail(`dist/Index.html missing ${helper}`);
 }
@@ -144,6 +166,7 @@ if (!distHtml.includes('confirmCancelBtn.focus()')) fail('In-app confirmation di
 if (distHtml.includes("<?!= include('QrCodeLibrary') ?>")) fail('dist/Index.html must inline the QR library');
 if (distHtml.includes('renderQrPlaceholder') || distHtml.includes('QR placeholder')) fail('dist/Index.html must not contain the QR placeholder');
 verifyInlineScripts(distHtml);
+verifyFrontendStartup(distHtml);
 verifyQrEncoder();
 verifyFormDescriptions();
 verifyAiServices();
@@ -269,6 +292,101 @@ function verifyInlineScripts(html) {
   });
 }
 
+function verifyFrontendStartup(html) {
+  const sandbox = createFrontendSandbox();
+  vm.createContext(sandbox);
+  const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1]);
+  try {
+    scripts.forEach((script, index) => new vm.Script(script, { filename: `dist-inline-${index + 1}.js` }).runInContext(sandbox));
+  } catch (error) {
+    fail(`dist/Index.html frontend startup failed: ${error.message}`);
+    return;
+  }
+  if (!sandbox.window.__e2e || typeof sandbox.window.__e2e.getCurrentJson !== 'function') {
+    fail('dist/Index.html frontend startup did not install the E2E bridge');
+  }
+}
+
+function createFrontendSandbox() {
+  const elements = new Map();
+  const fakeElement = createFakeElementFactory(elements);
+  const document = {
+    body: fakeElement('body'),
+    activeElement: fakeElement('activeElement'),
+    getElementById: fakeElement,
+    querySelector: (selector) => fakeElement(selector),
+    querySelectorAll: () => [],
+    createElement: (tag) => fakeElement(`created-${tag}-${elements.size}`),
+    execCommand: () => true,
+    contains: () => true
+  };
+  const sandbox = {
+    document,
+    navigator: { clipboard: { writeText: () => Promise.resolve() } },
+    google: { script: { run: createGoogleScriptRunner() } },
+    Option: function Option(text, value) { this.text = text; this.value = value; },
+    Blob: function Blob() {},
+    URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
+    setTimeout: (callback) => { callback(); return 1; },
+    clearTimeout() {},
+    console
+  };
+  sandbox.window = sandbox;
+  return sandbox;
+}
+
+function createFakeElementFactory(elements) {
+  return function fakeElement(id = '') {
+    if (elements.has(id)) return elements.get(id);
+    const element = {
+      id,
+      value: id === 'aiProvider' ? 'google-gemini' : '',
+      selectedIndex: 0,
+      options: id === 'aiProvider' ? [{ text: 'Google Gemini API', value: 'google-gemini' }] : [],
+      children: [],
+      dataset: {},
+      style: {},
+      classList: { add() {}, remove() {}, toggle() {} },
+      open: false,
+      disabled: false,
+      hidden: false,
+      textContent: '',
+      innerHTML: '',
+      addEventListener() {},
+      setAttribute() {},
+      removeAttribute() {},
+      append(...nodes) { this.children.push(...nodes); },
+      replaceChildren(...nodes) { this.children = nodes; },
+      focus() {},
+      select() {},
+      click() {},
+      remove() {},
+      scrollIntoView() {},
+      showModal() { this.open = true; },
+      close(value) { this.open = false; this.returnValue = value || ''; }
+    };
+    elements.set(id, element);
+    return element;
+  };
+}
+
+function createGoogleScriptRunner() {
+  let successHandler;
+  const runner = new Proxy({}, {
+    get(target, property) {
+      if (property === 'withSuccessHandler') return (handler) => { successHandler = handler; return runner; };
+      if (property === 'withFailureHandler') return () => runner;
+      return () => {
+        const onSuccess = successHandler;
+        successHandler = null;
+        if (onSuccess) onSuccess({ ok: true, hasApiKey: false, model: '', models: [] });
+        return runner;
+      };
+    }
+  });
+  return runner;
+}
+
 function verifyQrEncoder() {
   const qrLibrary = fs.readFileSync(path.join(root, 'src/QrCodeLibrary.html'), 'utf8');
   const qrcodegen = new Function(`${qrLibrary}; return qrcodegen;`)();
@@ -378,6 +496,9 @@ function verifyAiServices() {
   const generationRequest = requests.find((request) => request.url.includes(':generateContent') && JSON.parse(request.options.payload).generationConfig?.responseMimeType);
   const generationPayload = generationRequest ? JSON.parse(generationRequest.options.payload) : {};
   if (generationPayload.generationConfig?.responseMimeType !== 'application/json') fail('AI generation must request JSON output');
+  const smoke = services.AiService.runProviderSmoke('google-gemini');
+  if (!smoke.discussionOk || !smoke.generationOk || smoke.model !== 'models/gemini-test-flash') fail('Gemini provider smoke must verify discussion and generated JSON');
+  if (JSON.stringify(smoke).includes(TEST_AI_KEY)) fail('Gemini provider smoke must never return the API key');
   authFailure = true;
   try {
     services.AiService.listModels('google-gemini', TEST_AI_KEY);
@@ -452,6 +573,9 @@ function verifyGroqServices() {
   if (payload.response_format?.type !== 'json_object') fail('Groq generation must request JSON Object Mode');
   const discussionRequest = requests.find((request) => request.url.endsWith('/chat/completions') && !JSON.parse(request.options.payload).response_format);
   if (!discussionRequest || JSON.parse(discussionRequest.options.payload).messages[0].content.includes('Return JSON only')) fail('Groq discussion must use the non-JSON discussion prompt');
+  const smoke = services.AiService.runProviderSmoke('groq');
+  if (!smoke.discussionOk || !smoke.generationOk || smoke.model !== 'llama-test-chat') fail('Groq provider smoke must verify discussion and generated JSON');
+  if (JSON.stringify(smoke).includes(TEST_GROQ_KEY)) fail('Groq provider smoke must never return the API key');
   authFailure = true;
   try {
     services.AiService.listModels('groq', TEST_GROQ_KEY);

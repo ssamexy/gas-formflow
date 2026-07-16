@@ -152,6 +152,12 @@ function apiGenerateSpecWithAi(providerId, requirement, modelName) {
   });
 }
 
+function apiRunAiProviderSmoke(providerId) {
+  return runPrivateAiOperation_(function () {
+    return AiService.runProviderSmoke(providerId);
+  });
+}
+
 function runPrivateAiOperation_(operation) {
   if (isAgentMode_()) {
     return {
@@ -1054,6 +1060,38 @@ var AiService = (function () {
     };
   }
 
+  function runProviderSmoke(providerId) {
+    var selectedProvider = normalizeProviderId(providerId);
+    var provider = getProvider(selectedProvider);
+    var settings = provider.getSettings();
+    var models = provider.listModels('');
+    var selectedModel = settings.model;
+    if (!models.some(function (model) { return model.name === selectedModel; })) {
+      selectedModel = models.length ? models[0].name : '';
+    }
+    if (!selectedModel) throw new Error('AI_MODEL|No compatible model is available for the provider smoke test.');
+
+    var discussion = provider.discussForm([{
+      role: 'user',
+      content: '請確認你可以協助設計 Google 表單，並提供包含「目前表單雛型」標籤的極短草稿。'
+    }], selectedModel);
+    if (discussion.indexOf('目前表單雛型') === -1) {
+      throw new Error('AI_RESPONSE|The provider discussion smoke response missed the required outline label.');
+    }
+
+    var generation = provider.generateSpec('建立一份標題為 AI Provider Smoke Test、只有一題必填姓名短答題的表單。', selectedModel);
+    if (generation.ok === false || !generation.jsonText) {
+      throw new Error('AI_RESPONSE|The provider generated JSON did not pass FormFlow validation.');
+    }
+    return {
+      provider: selectedProvider,
+      model: selectedModel,
+      modelCount: models.length,
+      discussionOk: true,
+      generationOk: true
+    };
+  }
+
   function normalizeMessages(messages) {
     if (!Array.isArray(messages) || messages.length === 0) {
       throw new Error('AI_CONFIG|請先輸入想討論的表單需求。');
@@ -1102,6 +1140,7 @@ var AiService = (function () {
     clearSettings: clearSettings,
     discussForm: discussForm,
     generateSpec: generateSpec,
+    runProviderSmoke: runProviderSmoke,
     toUserMessage: toUserMessage
   };
 })();

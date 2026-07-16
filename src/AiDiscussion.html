@@ -1,0 +1,184 @@
+<script>
+
+    function sendAiChat() {
+      const message = aiChatInputEl.value.trim();
+      if (!hasStoredAiKey) {
+        setAiStatus('請先安全儲存 API Key。', true);
+        return;
+      }
+      if (!savedAiModel) {
+        setAiStatus('請先偵測、選擇並儲存模型。', true);
+        return;
+      }
+      if (message.length < 2) {
+        setAiStatus('請先輸入想和 AI 討論的內容。', true);
+        return;
+      }
+      const userMessage = { role: 'user', content: message };
+      aiConversation.push(userMessage);
+      updateWorkspaceGuidance();
+      appendChatMessage(userMessage);
+      aiChatInputEl.value = '';
+      resizeChatInput();
+      showChatThinking();
+      setAiStatus(`${getProviderLabel()} 正在整理需求與更新白話文雛型...`, false);
+      run('apiDiscussFormWithAi', [aiProviderEl.value, aiConversation, savedAiModel], (res) => {
+        if (!res.ok) {
+          setAiStatus((res.errors || ['AI 討論失敗。']).join('\n'), true);
+          aiChatInputEl.focus();
+          return;
+        }
+        const assistantMessage = { role: 'assistant', content: String(res.reply || '').trim() };
+        aiConversation.push(assistantMessage);
+        currentOutline = assistantMessage.content.includes('目前表單雛型') ? assistantMessage.content : '';
+        appendChatMessage(assistantMessage);
+        aiApproveBtn.disabled = !currentOutline;
+        if (currentOutline) {
+          setAiStatus('AI 已更新「目前表單雛型」。你可以繼續討論，或在確認後按下轉 JSON。', false);
+        } else {
+          setAiStatus('AI 尚未整理出「目前表單雛型」，請繼續討論；核准按鈕會保持停用。', true);
+        }
+        updateWorkspaceGuidance();
+        aiChatInputEl.focus();
+      });
+    }
+
+    function handleChatKeydown(event) {
+      if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      if (!aiChatSendBtn.disabled) sendAiChat();
+    }
+
+    function resizeChatInput() {
+      aiChatInputEl.style.height = 'auto';
+      aiChatInputEl.style.height = `${Math.min(aiChatInputEl.scrollHeight, 180)}px`;
+      updateChatSendState();
+    }
+
+    function updateChatSendState() {
+      aiChatSendBtn.disabled = isBusy || !hasStoredAiKey || !savedAiModel || aiChatInputEl.value.trim().length < 2;
+    }
+
+    function requestResetDiscussion() {
+      if (!aiConversation.length) {
+        resetAiDiscussion(true);
+        return;
+      }
+      openConfirmation({
+        title: '重新開始討論？',
+        message: '目前分頁中的對話與白話文雛型會被清除；已產生的 JSON 不會受影響。',
+        confirmLabel: '重新討論',
+        danger: true,
+        onConfirm: () => resetAiDiscussion(true)
+      });
+    }
+
+    function resetAiDiscussion(focusInput) {
+      aiConversation = [];
+      currentOutline = '';
+      aiChatLogEl.replaceChildren();
+      appendChatMessage({
+        role: 'assistant',
+        content: '請先告訴我這份表單的用途、填寫對象，以及你目前想到的問題。我會用白話文和你逐步討論，不會直接產生 JSON。'
+      });
+      aiChatInputEl.value = '';
+      resizeChatInput();
+      aiApproveBtn.disabled = true;
+      updateWorkspaceGuidance();
+      if (focusInput) aiChatInputEl.focus();
+    }
+
+    function appendChatMessage(message) {
+      const article = document.createElement('article');
+      article.className = `chat-message ${message.role === 'user' ? 'user' : 'assistant'}`;
+      const avatar = document.createElement('span');
+      avatar.className = 'chat-avatar';
+      avatar.textContent = message.role === 'user' ? '你' : 'AI';
+      avatar.setAttribute('aria-hidden', 'true');
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-content';
+      const label = document.createElement('small');
+      label.className = 'chat-role';
+      label.textContent = message.role === 'user' ? '你' : 'AI';
+      const content = document.createElement('div');
+      content.textContent = message.content;
+      bubble.append(label, content);
+      article.append(avatar, bubble);
+      aiChatLogEl.append(article);
+      aiChatLogEl.scrollTop = aiChatLogEl.scrollHeight;
+    }
+
+    function showChatThinking() {
+      removeChatThinking();
+      const article = document.createElement('article');
+      article.id = 'aiChatThinking';
+      article.className = 'chat-message assistant';
+      const avatar = document.createElement('span');
+      avatar.className = 'chat-avatar';
+      avatar.textContent = 'AI';
+      avatar.setAttribute('aria-hidden', 'true');
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-content';
+      const label = document.createElement('small');
+      label.className = 'chat-role';
+      label.textContent = 'AI 正在思考';
+      const dots = document.createElement('span');
+      dots.className = 'typing-dots';
+      dots.setAttribute('aria-label', 'AI 正在思考');
+      dots.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
+      bubble.append(label, dots);
+      article.append(avatar, bubble);
+      aiChatLogEl.append(article);
+      aiChatLogEl.setAttribute('aria-busy', 'true');
+      aiChatLogEl.scrollTop = aiChatLogEl.scrollHeight;
+    }
+
+    function removeChatThinking() {
+      document.getElementById('aiChatThinking')?.remove();
+      aiChatLogEl.removeAttribute('aria-busy');
+    }
+
+    function requestOutlineApproval() {
+      if (!currentOutline || !savedAiModel) {
+        setAiStatus('請先完成至少一輪討論並儲存模型。', true);
+        return;
+      }
+      openConfirmation({
+        title: '採用目前表單雛型？',
+        message: '確認後，AI 會把這份白話文雛型轉成 FormFlow JSON，開啟進階編輯區並更新右側預覽。原對話仍會保留。',
+        detail: currentOutline,
+        confirmLabel: '採用並轉成 JSON',
+        onConfirm: approveOutlineAndGenerateJson
+      });
+    }
+
+    function approveOutlineAndGenerateJson() {
+      setAiStatus('正在依你核准的白話文雛型轉換並驗證 JSON...', false);
+      run('apiGenerateSpecFromOutline', [aiProviderEl.value, currentOutline, savedAiModel], (res) => {
+        if (res.jsonText) {
+          input.value = res.jsonText;
+          setJsonSource('generated');
+          resultEl.innerHTML = '';
+          jsonPanelEl.open = true;
+        }
+        if (!res.ok) {
+          renderPreviewEmptyState('JSON 尚未通過驗證', '已保留 AI 草稿，請在進階 JSON 區修正後再更新預覽。');
+          setAiStatus((res.errors || ['JSON 轉換失敗。']).join('\n'), true);
+          setStatus('AI 已保留 JSON 草稿，但尚未通過驗證；你可以在獨立 JSON 區修改。', 'error');
+          return;
+        }
+        setAiStatus(`你核准的雛型已轉成 JSON。模型：${String(res.model || '').replace(/^models\//, '')}`, false);
+        setStatus('JSON 已通過驗證，正在更新右側預覽。', 'ok');
+        previewSpec();
+      });
+    }
+
+    function getProviderLabel() {
+      return aiProviderEl.options[aiProviderEl.selectedIndex]?.text || aiProviderEl.value;
+    }
+
+    function setAiStatus(message, isError) {
+      aiStatusEl.textContent = message;
+      aiStatusEl.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+    }
+</script>

@@ -1,0 +1,217 @@
+<script>
+    function renderPreview(data) {
+      const form = data.form;
+      const sheet = data.sheet;
+      hasRenderedPreview = true;
+      previewEl.innerHTML = `
+        <div class="google-form-preview" aria-label="Google 表單外觀預覽">
+          <section class="google-form-card google-form-title-card">
+            <h3>${escapeHtml(form.title)}</h3>
+            <p class="google-form-description">${escapeHtml(form.description || '')}</p>
+            <div class="google-form-meta"><span class="google-form-required">*</span> 表示必填問題 · 共 ${form.itemCount} 個項目</div>
+          </section>
+          ${form.items.map(renderGoogleFormItem).join('')}
+        </div>
+        <details class="sheet-preview">
+          <summary>查看回應 Sheet 與統計規劃</summary>
+          <div class="sheet-preview-body">
+            <div class="item"><strong>分頁</strong><small>${sheet.sheets.map(escapeHtml).join(' / ')}</small></div>
+            <div class="item"><strong>Clean_Data 欄位</strong><small>${sheet.cleanDataColumns.map(escapeHtml).join(' | ')}</small></div>
+            <div class="item"><strong>可統計欄位</strong><small>${sheet.statFields.map(escapeHtml).join(' / ') || '無'}</small></div>
+            <div class="item"><strong>不適合自動統計</strong><small>${sheet.nonStatFields.map(escapeHtml).join(' / ') || '無'}</small></div>
+            <div class="item"><strong>統計摘要規劃</strong><small>${sheet.summaryPlan.map(escapeHtml).join(' / ')}</small></div>
+          </div>
+        </details>
+      `;
+      updateWorkspaceGuidance();
+    }
+
+    function renderGoogleFormItem(item) {
+      if (item.type === 'sectionHeader' || item.type === 'pageBreak') {
+        return `
+          <section class="google-form-card google-form-section">
+            <h3>${escapeHtml(item.title || (item.type === 'pageBreak' ? '下一節' : '區段標題'))}</h3>
+            ${item.helpText ? `<p class="google-form-help">${escapeHtml(item.helpText)}</p>` : ''}
+          </section>
+        `;
+      }
+      return `
+        <section class="google-form-card google-form-question">
+          <h4 class="google-form-question-title">
+            ${escapeHtml(item.title)}
+            ${item.required ? '<span class="google-form-required" aria-label="必填">*</span>' : ''}
+          </h4>
+          ${item.helpText ? `<p class="google-form-help">${escapeHtml(item.helpText)}</p>` : ''}
+          <div class="google-form-control">${renderGoogleFormControl(item)}</div>
+        </section>
+      `;
+    }
+
+    function renderGoogleFormControl(item) {
+      switch (item.type) {
+        case 'shortText':
+          return '<div class="google-form-line">你的回答</div>';
+        case 'paragraph':
+          return '<div class="google-form-line paragraph">你的回答</div>';
+        case 'multipleChoice':
+          return renderGoogleFormChoices(item, 'radio');
+        case 'checkbox':
+          return renderGoogleFormChoices(item, 'checkbox');
+        case 'dropdown':
+          return '<select class="google-form-select" disabled aria-label="下拉式選單預覽"><option>選擇</option>' +
+            (item.options || []).map((option) => '<option>' + escapeHtml(option) + '</option>').join('') + '</select>';
+        case 'date':
+          return '<input class="google-form-date-time" type="date" disabled aria-label="日期欄位預覽">';
+        case 'time':
+          return '<input class="google-form-date-time" type="time" disabled aria-label="時間欄位預覽">';
+        case 'scale':
+          return renderGoogleFormScale(item);
+        case 'grid':
+          return renderGoogleFormGrid(item, false);
+        case 'checkboxGrid':
+          return renderGoogleFormGrid(item, true);
+        default:
+          return '<div class="google-form-line">回答欄位</div>';
+      }
+    }
+
+    function renderGoogleFormChoices(item, inputType) {
+      return (item.options || []).map((option) => `
+        <label class="google-form-choice">
+          <input type="${inputType}" disabled aria-hidden="true">
+          <span>${escapeHtml(option)}</span>
+        </label>
+      `).join('');
+    }
+
+    function renderGoogleFormScale(item) {
+      const parsedLower = Number(item.lowerBound);
+      const parsedUpper = Number(item.upperBound);
+      const lower = Number.isFinite(parsedLower) ? parsedLower : 1;
+      const upper = Number.isFinite(parsedUpper) ? parsedUpper : 5;
+      const choices = [];
+      for (let value = lower; value <= upper; value++) {
+        choices.push(`<span class="google-form-scale-option"><span>${value}</span><span class="google-form-scale-dot"></span></span>`);
+      }
+      return `
+        <div class="google-form-scale">
+          <span class="google-form-scale-label">${escapeHtml(item.lowerLabel || '')}</span>
+          ${choices.join('')}
+          <span class="google-form-scale-label">${escapeHtml(item.upperLabel || '')}</span>
+        </div>
+      `;
+    }
+
+    function renderGoogleFormGrid(item, allowsMultiple) {
+      const markerClass = allowsMultiple ? 'google-form-grid-mark checkbox' : 'google-form-grid-mark';
+      return `
+        <div class="google-form-grid-wrap">
+          <table class="google-form-grid">
+            <thead><tr><th></th>${(item.columns || []).map((column) => `<th>${escapeHtml(column)}</th>`).join('')}</tr></thead>
+            <tbody>
+              ${(item.rows || []).map((row) => `
+                <tr>
+                  <td>${escapeHtml(row)}</td>
+                  ${(item.columns || []).map(() => `<td><span class="${markerClass}"></span></td>`).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderPreviewEmptyState(title, message) {
+      hasRenderedPreview = false;
+      previewEl.replaceChildren();
+      const section = document.createElement('div');
+      section.className = 'empty-state';
+      const content = document.createElement('div');
+      const icon = document.createElement('div');
+      icon.className = 'empty-state-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = '▤';
+      const heading = document.createElement('h3');
+      heading.textContent = title;
+      const body = document.createElement('p');
+      body.textContent = message;
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.textContent = hasStoredAiKey && savedAiModel ? '回到 AI 討論' : '開啟 AI 設定';
+      action.addEventListener('click', startCurrentStep);
+      content.append(icon, heading, body, action);
+      section.append(content);
+      previewEl.append(section);
+      updateWorkspaceGuidance();
+    }
+
+    function renderResult(res) {
+      const qrSvg = renderQrCode(res.qrCode?.text || res.publishedUrl);
+      resultEl.innerHTML = `
+        <h3>建立結果</h3>
+        <div class="item"><strong>填寫連結</strong><small><a href="${escapeAttr(res.publishedUrl)}" target="_blank">${escapeHtml(res.publishedUrl)}</a></small></div>
+        <div class="item"><strong>編輯連結</strong><small><a href="${escapeAttr(res.editUrl)}" target="_blank">${escapeHtml(res.editUrl)}</a></small></div>
+        <div class="item"><strong>Sheet</strong><small><a href="${escapeAttr(res.sheetUrl)}" target="_blank">${escapeHtml(res.sheetUrl)}</a></small></div>
+        <div class="item"><strong>建立時間</strong><small>${escapeHtml(res.createdAt)}</small></div>
+        <h3>QR code</h3>
+        <div class="qr">${qrSvg}</div>
+        <button onclick="downloadQr()">下載 QR code</button>
+        <h3>公告文案</h3>
+        <div id="announcement" class="copybox">${escapeHtml(res.announcement)}</div>
+        <button onclick="copyAnnouncement()">複製公告</button>
+      `;
+    }
+
+    function renderQrCode(text) {
+      const qr = qrcodegen.QrCode.encodeText(String(text), qrcodegen.QrCode.Ecc.MEDIUM);
+      const border = 4;
+      const size = qr.size + border * 2;
+      const modules = [];
+      for (let y = 0; y < qr.size; y++) {
+        for (let x = 0; x < qr.size; x++) {
+          if (qr.getModule(x, y)) modules.push(`M${x + border},${y + border}h1v1h-1z`);
+        }
+      }
+      window.__lastQrSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="white"/><path d="${modules.join('')}" fill="#17201b"/></svg>`;
+      return window.__lastQrSvg;
+    }
+
+    function downloadQr() {
+      const blob = new Blob([window.__lastQrSvg || ''], { type: 'image/svg+xml' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'gas-formflow-qr-code.svg';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function copyAnnouncement() {
+      const text = document.getElementById('announcement')?.innerText || '';
+      navigator.clipboard.writeText(text).then(() => setStatus('公告文案已複製。', 'ok'));
+    }
+
+    function setStatus(message, type) {
+      statusEl.textContent = message;
+      statusEl.className = 'status' + (type ? ' ' + type : '');
+    }
+
+    function setBusy(busy) {
+      isBusy = busy;
+      buttons.forEach((button) => button.disabled = busy);
+      if (!busy) {
+        removeChatThinking();
+        aiApproveBtn.disabled = !currentOutline;
+        aiModelEl.disabled = aiModelEl.options.length === 0 || !aiModelEl.value;
+        copyExampleBtn.disabled = !currentExampleKey;
+      }
+      updateChatSendState();
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replace(/`/g, '&#96;');
+    }
+</script>

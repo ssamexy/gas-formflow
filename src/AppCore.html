@@ -1,0 +1,139 @@
+<script>
+    function loadExampleIntoEditor(key, announce) {
+      const spec = examples[key];
+      if (!spec) return;
+      input.value = JSON.stringify(spec, null, 2);
+      exampleSelectEl.value = key;
+      setJsonSource('example', key);
+      if (!announce) return;
+      jsonPanelEl.open = true;
+      setStatus('範例已載入並以紫色標示；可預覽、修改，或複製給其他 AI 當模板。', 'ok');
+      resultEl.innerHTML = '';
+      renderPreviewEmptyState('範例已載入', '按「更新右側預覽」查看這份表單。');
+    }
+
+    function setJsonSource(source, exampleKey) {
+      const isExample = source === 'example';
+      currentExampleKey = isExample ? exampleKey : '';
+      input.classList.toggle('example-json', isExample);
+      copyExampleBtn.disabled = !isExample;
+      if (!isExample) exampleSelectEl.value = '';
+    }
+
+    async function copySelectedExample() {
+      if (!currentExampleKey || !examples[currentExampleKey]) {
+        setStatus('請先選擇要複製的範例。', 'error');
+        return;
+      }
+      try {
+        await writeClipboardText(JSON.stringify(examples[currentExampleKey], null, 2));
+        setStatus('完整範例 JSON 已複製，可貼給其他 AI 當格式模板。', 'ok');
+      } catch (error) {
+        setStatus('無法自動複製，請選取紫色範例文字後手動複製。', 'error');
+      }
+    }
+
+    async function writeClipboardText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return;
+        } catch (error) {
+          // GAS iframe permissions can block the Clipboard API; use the local selection fallback below.
+        }
+      }
+      const helper = document.createElement('textarea');
+      helper.value = text;
+      helper.setAttribute('readonly', '');
+      helper.style.position = 'fixed';
+      helper.style.opacity = '0';
+      document.body.append(helper);
+      helper.select();
+      const copied = document.execCommand('copy');
+      helper.remove();
+      if (!copied) throw new Error('Clipboard write was rejected.');
+    }
+
+    function openAiSettings() {
+      if (!aiSettingsDialog.open) aiSettingsDialog.showModal();
+    }
+
+    function closeAiSettings() {
+      if (aiSettingsDialog.open) aiSettingsDialog.close();
+    }
+
+    function focusDiscussion() {
+      if (!hasStoredAiKey || !savedAiModel) {
+        openAiSettings();
+        return;
+      }
+      document.getElementById('discussionHeading').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      aiChatInputEl.focus({ preventScroll: true });
+    }
+
+    function focusBuildArea() {
+      if (!currentOutline && !hasRenderedPreview) {
+        focusDiscussion();
+        return;
+      }
+      document.querySelector('.preview-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function startCurrentStep() {
+      if (!hasStoredAiKey || !savedAiModel) openAiSettings();
+      else focusDiscussion();
+    }
+
+    function useStarterPrompt(event) {
+      const button = event.target.closest('[data-starter-prompt]');
+      if (!button || button.disabled) return;
+      aiChatInputEl.value = button.dataset.starterPrompt || '';
+      resizeChatInput();
+      aiChatInputEl.focus();
+    }
+
+    function updateWorkspaceGuidance() {
+      const isReady = hasStoredAiKey && !!savedAiModel;
+      connectionStatusEl.classList.toggle('ready', isReady);
+      connectionLabelEl.textContent = isReady
+        ? `${getProviderLabel()} · ${savedAiModel.replace(/^models\//, '')}`
+        : hasStoredAiKey ? '已儲存 Key · 尚未選模型' : '尚未連接 AI';
+      onboardingCardEl.hidden = isReady;
+      starterPromptsEl.hidden = !isReady || aiConversation.length > 0;
+      setWorkflowStepState(workflowSetupEl, isReady ? 'complete' : 'current');
+      setWorkflowStepState(workflowDiscussEl, currentOutline ? 'complete' : isReady ? 'current' : '');
+      setWorkflowStepState(workflowBuildEl, hasRenderedPreview ? 'complete' : currentOutline ? 'current' : '');
+    }
+
+    function setWorkflowStepState(element, state) {
+      element.classList.toggle('current', state === 'current');
+      element.classList.toggle('complete', state === 'complete');
+    }
+
+    function openConfirmation(options) {
+      pendingConfirmation = {
+        onConfirm: options.onConfirm,
+        onCancel: options.onCancel,
+        returnFocus: document.activeElement
+      };
+      confirmTitleEl.textContent = options.title;
+      confirmMessageEl.textContent = options.message;
+      confirmActionBtn.textContent = options.confirmLabel || '確認';
+      confirmActionBtn.className = options.danger ? 'button-danger' : 'primary';
+      confirmDetailEl.hidden = !options.detail;
+      confirmDetailEl.textContent = options.detail || '';
+      confirmDialog.showModal();
+      confirmCancelBtn.focus();
+    }
+
+    function handleConfirmDialogClose() {
+      const pending = pendingConfirmation;
+      pendingConfirmation = null;
+      if (!pending) return;
+      const confirmed = confirmDialog.returnValue === 'confirm';
+      if (pending.returnFocus && document.contains(pending.returnFocus)) pending.returnFocus.focus();
+      if (confirmed) pending.onConfirm();
+      else if (pending.onCancel) pending.onCancel();
+    }
+
+</script>

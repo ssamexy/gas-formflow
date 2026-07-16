@@ -24,6 +24,19 @@ WEB_APP_URL?mode=agent-test
 
 This endpoint does not create Google Forms or Google Sheets.
 
+## Private AI Provider Smoke
+
+Real Gemini and Groq calls are intentionally disabled in public `agent` mode. To verify an already configured provider, keep the project in `private` mode, push the private build, and run:
+
+```bash
+clasp run apiRunAiProviderSmoke -p '["google-gemini"]'
+clasp run apiRunAiProviderSmoke -p '["groq"]'
+```
+
+Each smoke test uses the API Key already stored in Apps Script `ScriptProperties`. It lists compatible models, performs one short discussion request, and generates one minimal FormFlow JSON document. The response contains only the provider ID, selected model, model count, and `discussionOk` / `generationOk` booleans; it never returns or logs the API Key.
+
+The smoke test does not create Google Forms or Sheets, but it makes three provider requests and consumes provider quota. It fails closed in `agent` mode. `clasp run` also requires an API executable deployment and an authorized clasp account; see the deployment prerequisites if Apps Script reports that the function cannot be found.
+
 For full state-changing verification:
 
 ```text

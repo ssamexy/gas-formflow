@@ -1,0 +1,157 @@
+<script>
+    function switchAiProvider() {
+      aiApiKeyEl.value = '';
+      hasStoredAiKey = false;
+      savedAiModel = '';
+      detectedAiModels = [];
+      populateAiModels([], '');
+      resetAiDiscussion(false);
+      updateProviderInfo();
+      updateWorkspaceGuidance();
+      loadAiSettings();
+    }
+
+    function updateProviderInfo() {
+      aiProviderInfoEl.textContent = aiProviderEl.value === 'groq'
+        ? 'Groq：推論資料預設不保留；完整 ZDR 需在 Groq Data Controls 啟用，usage metadata 仍會保留。'
+        : 'Gemini：模型清單會依目前 Key 動態取得；實際 free tier 與 quota 由 Google 決定。';
+      aiApiKeyEl.placeholder = aiProviderEl.value === 'groq'
+        ? '輸入 Groq API Key'
+        : '輸入 Gemini API Key';
+    }
+
+    function loadAiSettings() {
+      run('apiGetAiSettings', [aiProviderEl.value], (res) => {
+        if (!res.ok) {
+          setAiStatus((res.errors || ['無法讀取 AI 設定。']).join('\n'), true);
+          return;
+        }
+        hasStoredAiKey = !!res.hasApiKey;
+        savedAiModel = res.model || '';
+        if (savedAiModel) populateAiModels([{ name: savedAiModel, label: savedAiModel.replace(/^models\//, ''), description: '', inputTokenLimit: 0, outputTokenLimit: 0 }], savedAiModel);
+        setAiStatus(hasStoredAiKey ? `${getProviderLabel()} 已儲存 API Key，不會回填明碼。` : `${getProviderLabel()} 尚未儲存 API Key。請先在密碼欄輸入並按「安全儲存 Key」。`, false);
+        updateChatSendState();
+        updateWorkspaceGuidance();
+      });
+    }
+
+    function saveAiKey() {
+      const apiKey = aiApiKeyEl.value.trim();
+      if (apiKey.length < 20) {
+        setAiStatus(`請輸入有效的 ${getProviderLabel()} API Key。`, true);
+        return;
+      }
+      setAiStatus(`正在驗證並安全儲存 ${getProviderLabel()} Key...`, false);
+      run('apiSaveAiKey', [aiProviderEl.value, apiKey], (res) => {
+        aiApiKeyEl.value = '';
+        if (!res.ok) {
+          setAiStatus((res.errors || ['API Key 儲存失敗。']).join('\n'), true);
+          return;
+        }
+        hasStoredAiKey = true;
+        savedAiModel = res.model || savedAiModel;
+        detectedAiModels = res.models || [];
+        populateAiModels(detectedAiModels, res.model || savedAiModel);
+        setAiStatus(`Key 已安全儲存並清空輸入欄；偵測到 ${detectedAiModels.length} 個適合表單設計的模型。`, false);
+        updateChatSendState();
+        updateWorkspaceGuidance();
+      });
+    }
+
+    function detectAiModels() {
+      if (!hasStoredAiKey) {
+        setAiStatus(`請先按「安全儲存 Key」。`, true);
+        return;
+      }
+      setAiStatus(`正在向 ${getProviderLabel()} 偵測可用模型...`, false);
+      run('apiListAiModels', [aiProviderEl.value, ''], (res) => {
+        if (!res.ok) {
+          setAiStatus((res.errors || ['模型偵測失敗。']).join('\n'), true);
+          return;
+        }
+        detectedAiModels = res.models || [];
+        populateAiModels(detectedAiModels, savedAiModel);
+        setAiStatus(`偵測到 ${detectedAiModels.length} 個適合表單討論與 JSON 轉換的模型。請選擇後儲存模型。`, detectedAiModels.length === 0);
+      });
+    }
+
+    function populateAiModels(models, selectedModel) {
+      aiModelEl.replaceChildren();
+      if (!models.length) {
+        aiModelEl.append(new Option('沒有可用模型', ''));
+        aiModelEl.disabled = true;
+        renderAiModelInfo();
+        return;
+      }
+      models.forEach((model) => {
+        const tokens = model.outputTokenLimit ? ` · output ${model.outputTokenLimit.toLocaleString()} tokens` : '';
+        aiModelEl.append(new Option(`${model.label}${tokens}`, model.name));
+      });
+      aiModelEl.disabled = false;
+      if (selectedModel && models.some((model) => model.name === selectedModel)) aiModelEl.value = selectedModel;
+      renderAiModelInfo();
+    }
+
+    function renderAiModelInfo() {
+      const selected = detectedAiModels.find((model) => model.name === aiModelEl.value);
+      if (!selected) {
+        aiModelInfoEl.textContent = aiModelEl.value ? `目前模型：${aiModelEl.value.replace(/^models\//, '')}` : '';
+        return;
+      }
+      const limits = [
+        selected.inputTokenLimit ? `輸入上限 ${selected.inputTokenLimit.toLocaleString()}` : '',
+        selected.outputTokenLimit ? `輸出上限 ${selected.outputTokenLimit.toLocaleString()}` : ''
+      ].filter(Boolean).join('；');
+      aiModelInfoEl.textContent = [selected.description, limits].filter(Boolean).join('\n');
+    }
+
+    function saveAiModel() {
+      if (!hasStoredAiKey) {
+        setAiStatus('請先安全儲存 API Key。', true);
+        return;
+      }
+      if (!aiModelEl.value) {
+        setAiStatus('請先偵測並選擇模型。', true);
+        return;
+      }
+      run('apiSaveAiModel', [aiProviderEl.value, aiModelEl.value], (res) => {
+        if (!res.ok) {
+          setAiStatus((res.errors || ['模型儲存失敗。']).join('\n'), true);
+          return;
+        }
+        savedAiModel = res.model || aiModelEl.value;
+        setAiStatus(`模型已儲存：${savedAiModel.replace(/^models\//, '')}。現在可以開始與 AI 討論。`, false);
+        updateChatSendState();
+        updateWorkspaceGuidance();
+      });
+    }
+
+    function requestClearAiSettings() {
+      closeAiSettings();
+      setTimeout(() => openConfirmation({
+        title: `清除 ${getProviderLabel()} 設定？`,
+        message: '這會從 Apps Script Properties 刪除已儲存的 API Key 與模型。',
+        confirmLabel: '清除設定',
+        danger: true,
+        onConfirm: clearAiSettings,
+        onCancel: openAiSettings
+      }), 0);
+    }
+
+    function clearAiSettings() {
+      run('apiClearAiSettings', [aiProviderEl.value], (res) => {
+        if (!res.ok) {
+          setAiStatus((res.errors || ['AI 設定清除失敗。']).join('\n'), true);
+          return;
+        }
+        aiApiKeyEl.value = '';
+        hasStoredAiKey = false;
+        savedAiModel = '';
+        detectedAiModels = [];
+        populateAiModels([], '');
+        setAiStatus('AI 設定已清除。', false);
+        resetAiDiscussion(false);
+        updateWorkspaceGuidance();
+      });
+    }
+</script>

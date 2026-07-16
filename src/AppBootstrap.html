@@ -1,0 +1,53 @@
+<script>
+    exampleSelectEl.addEventListener('change', (event) => loadExampleIntoEditor(event.target.value, true));
+    copyExampleBtn.addEventListener('click', copySelectedExample);
+    input.addEventListener('input', () => setJsonSource('custom'));
+    document.getElementById('validateBtn').addEventListener('click', validateSpec);
+    document.getElementById('previewBtn').addEventListener('click', previewSpec);
+    document.getElementById('createBtn').addEventListener('click', requestCreateFlow);
+    document.getElementById('aiSaveKeyBtn').addEventListener('click', saveAiKey);
+    document.getElementById('aiDetectBtn').addEventListener('click', detectAiModels);
+    document.getElementById('aiSaveModelBtn').addEventListener('click', saveAiModel);
+    document.getElementById('aiClearBtn').addEventListener('click', requestClearAiSettings);
+    aiChatSendBtn.addEventListener('click', sendAiChat);
+    document.getElementById('aiChatResetBtn').addEventListener('click', requestResetDiscussion);
+    aiChatInputEl.addEventListener('keydown', handleChatKeydown);
+    aiChatInputEl.addEventListener('input', resizeChatInput);
+    aiApproveBtn.addEventListener('click', requestOutlineApproval);
+    aiProviderEl.addEventListener('change', switchAiProvider);
+    aiModelEl.addEventListener('change', renderAiModelInfo);
+    document.getElementById('aiSettingsBtn').addEventListener('click', openAiSettings);
+    document.getElementById('onboardingSettingsBtn').addEventListener('click', openAiSettings);
+    document.getElementById('aiSettingsCloseBtn').addEventListener('click', closeAiSettings);
+    document.getElementById('aiSettingsDoneBtn').addEventListener('click', closeAiSettings);
+    document.getElementById('workflowSetupBtn').addEventListener('click', openAiSettings);
+    document.getElementById('workflowDiscussBtn').addEventListener('click', focusDiscussion);
+    document.getElementById('workflowBuildBtn').addEventListener('click', focusBuildArea);
+    document.getElementById('previewStartBtn').addEventListener('click', startCurrentStep);
+    starterPromptsEl.addEventListener('click', useStarterPrompt);
+    confirmCancelBtn.addEventListener('click', () => confirmDialog.close('cancel'));
+    document.getElementById('confirmCloseBtn').addEventListener('click', () => confirmDialog.close('cancel'));
+    confirmActionBtn.addEventListener('click', () => confirmDialog.close('confirm'));
+    confirmDialog.addEventListener('close', handleConfirmDialogClose);
+    loadExampleIntoEditor('event', false);
+    window.__e2e = {
+      getExampleKeys: () => Object.keys(examples),
+      getCurrentJson: () => input.value,
+      getStatusText: () => statusEl.textContent,
+      getConversation: () => aiConversation.map((message) => ({ ...message })),
+      getCurrentOutline: () => currentOutline,
+      isSettingsOpen: () => aiSettingsDialog.open,
+      isConfirmOpen: () => confirmDialog.open,
+      hasPreview: () => previewEl.children.length > 0,
+      getJsonSource: () => currentExampleKey ? 'example' : 'custom',
+      loadExample: (key) => {
+        if (!examples[key]) return false;
+        loadExampleIntoEditor(key, false);
+        return true;
+      }
+    };
+    resetAiDiscussion(false);
+    updateProviderInfo();
+    updateWorkspaceGuidance();
+    loadAiSettings();
+</script>

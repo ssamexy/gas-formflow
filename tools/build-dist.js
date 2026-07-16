@@ -44,11 +44,21 @@ const code = banner + codeFiles.map((file) => {
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(root, 'dist/Code.gs'), code, 'utf8');
 const indexTemplate = fs.readFileSync(path.join(root, 'src/Index.html'), 'utf8');
-const qrCodeLibrary = fs.readFileSync(path.join(root, 'src/QrCodeLibrary.html'), 'utf8');
-const distIndex = indexTemplate.replace("<?!= include('QrCodeLibrary') ?>", qrCodeLibrary);
+const distIndex = inlineHtmlIncludes(indexTemplate, ['Index']);
 fs.writeFileSync(path.join(root, 'dist/Index.html'), distIndex, 'utf8');
 fs.copyFileSync(path.join(root, manifestByMode[mode]), path.join(root, 'dist/appsscript.json'));
 if (mode === 'private') {
   fs.copyFileSync(path.join(root, manifestByMode[mode]), path.join(root, 'appsscript.json'));
 }
 console.log(`Built dist/Code.gs, dist/Index.html, and dist/appsscript.json (${mode} mode)`);
+
+function inlineHtmlIncludes(source, ancestry) {
+  return source.replace(/<\?!=\s*include\('([A-Za-z0-9_-]+)'\)\s*\?>/g, (match, includeName) => {
+    if (ancestry.includes(includeName)) {
+      throw new Error(`Circular HTML include: ${ancestry.concat(includeName).join(' -> ')}`);
+    }
+    const includePath = path.join(root, 'src', `${includeName}.html`);
+    if (!fs.existsSync(includePath)) throw new Error(`Missing HTML include: ${includeName}`);
+    return inlineHtmlIncludes(fs.readFileSync(includePath, 'utf8'), ancestry.concat(includeName));
+  });
+}

@@ -106,6 +106,8 @@ docs/      schema、prompt、部署教學
 tools/     本地打包與驗證腳本
 ```
 
+`src/` 的 HTML、CSS 與前端 JavaScript 會依功能拆分以方便維護；`npm run build:private` 會將所有片段與 QR library 完整內嵌回單一 `dist/Index.html`。初學者仍只需複製 `dist/Code.gs` 與 `dist/Index.html`，不需要理解或逐一建立來源模組檔案。`npm run check` 會阻止任何未內嵌的 `include(...)` 進入 copy/paste 版本。
+
 ## v1 功能
 
 - JSON 輸入、範例載入、驗證與接近 Google Forms 填寫畫面的預覽
@@ -132,6 +134,7 @@ QR code 會由 Web App 在瀏覽器內使用內嵌的 Nayuki QR Code generator v
 - JSON 編輯區也接受其他 AI 產生的 JSON，並可在右側預覽。
 - 首次使用提供「連接 AI → 討論雛型 → 預覽建立」導引與 starter prompts；Key／模型藏在 AI 設定視窗，確認動作使用應用程式內 dialog。
 - Key 不會回傳前端、寫入 log 或放進 API URL；公開 `agent` 模式停用所有 AI 功能。
+- private 模式提供 `apiRunAiProviderSmoke(providerId)`，可用已儲存的 Key 真實驗證模型列舉、討論與 JSON 生成；回傳資料不包含 Key。
 
 模型出現在清單中不代表一定具有免費額度；free tier、地區限制與 quota 由 Google 決定。完整設定方式：
 
