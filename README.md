@@ -1,243 +1,76 @@
 # GAS FormFlow
 
-用 Google Forms + Google Apps Script 打造私有化、免費、AI-ready 的表單工作流。
+用自己的 Google 帳號部署一套私有、免費、AI-ready 的表單工作流。
 
-只需設定一次，之後即可在手機上貼入 AI 產生的 JSON，一鍵建立 Google Form、回應 Sheet、可掃描 QR code、公告文案與基本統計骨架。
+設定一次後，即可在手機或電腦與 AI 討論表單、預覽內容，並建立 Google Form、回應 Sheet、統計頁、公告文案與可掃描 QR code。產生的 Form 與 Sheet 都留在你的 Google Drive。
+
+## 10 分鐘快速安裝
+
+GAS FormFlow 使用獨立的 Google Apps Script Web App，不需要綁定既有 Sheet。
+
+1. 開啟 [Google Apps Script](https://script.google.com/) 並建立新專案。
+2. 將 [dist/Code.gs](dist/Code.gs) 全部複製到專案的 `Code.gs`。
+3. 新增 HTML 檔案 `Index`，將 [dist/Index.html](dist/Index.html) 全部貼入。
+4. 儲存後執行一次 `setup`，使用自己的 Google 帳號完成授權。
+5. 點「部署」→「新增部署作業」→「網頁應用程式」。
+6. 執行身分選「我」；存取權固定選「只有我自己」。
+7. 開啟部署完成後取得的 Web App URL，即可開始使用。
+
+請勿把存取權設成「任何人」或「擁有連結的任何人」。這個 Web App 能以部署者身分建立 Form、Sheet，並可能使用部署者儲存的 AI API Key。
+
+完整圖文步驟：
+
+- [繁體中文安裝教學](docs/install.zh-TW.md)
+- [English installation guide](docs/install.en.md)
+- [安全、資料與權限說明](SECURITY.md)
+
+## 使用流程
+
+1. 選擇性設定自己的 Gemini 或 Groq API Key。
+2. 用白話描述活動、調查或報名需求。
+3. 與 AI 確認表單雛型。
+4. 核准並轉成 FormFlow JSON。
+5. 預覽後建立 Form、Sheet、QR code 與公告文案。
+
+不想設定 API Key，也可以貼入其他 AI 產生的 FormFlow JSON，或直接載入內建範例。
 
 ## 適合用途
 
-- 活動報名
-- 意願調查
-- 出席統計
-- 志工支援調查
-- 小組 / 區域統計
-- 課程報名
-- 滿意度回饋
-- 家庭 / 房型 / 人數統計
+- 活動與課程報名
+- 出席、意願與志工調查
+- 小組、家庭、人數與房型統計
+- 滿意度與活動回饋
 
-## 不適合用途
+目前不支援檔案上傳、複雜跳題、正式考試測驗、大型問卷平台與高度客製視覺表單。遇到少數特殊題型，可先建立基本表單，再到 Google Forms 後台微調。
 
-- 檔案上傳表單
-- 複雜跳題問卷
-- 正式考試測驗
-- 大型問卷平台
-- 高度客製視覺表單
+## AI 與隱私
 
-## 安全提醒
+- Form、Sheet 與 API Key 都由使用者自己的 Apps Script 專案管理。
+- API Key 儲存在 Script Properties，不會回傳到主畫面或寫入 log。
+- 只有使用 AI 功能時，表單討論內容才會送到使用者選擇的 Gemini 或 Groq。
+- QR code 在瀏覽器內產生，表單網址不會送到外部 QR 服務。
 
-建議自行部署自己的 Web App。不要直接使用陌生人部署好的 Web App。若使用別人的 Web App，表單與 Sheet 可能建立在對方 Google 帳號底下。自行部署後，表單與 Sheet 會建立在自己的 Google 帳號底下。
-
-第一次授權時，Google 可能會顯示未驗證應用程式。這是因為你正在執行自己建立的 Apps Script 專案。請確認程式碼來自你信任的 repo 後再繼續授權。
-
-## 小白安裝教學
-
-完整教學：
-
-- [繁體中文部署方法](docs/install.zh-TW.md)
-- [English installation guide](docs/install.en.md)
-
-簡短版：
-
-1. 打開 Google Apps Script。
-2. 建立新專案，命名為 GAS FormFlow。
-3. 複製 `dist/Code.gs` 全部內容到 Apps Script 的 `Code.gs`。
-4. 新增 HTML 檔案 `Index`。
-5. 複製 `dist/Index.html` 全部內容到 Apps Script 的 `Index.html`。
-6. 儲存專案。
-7. 執行一次 `setup` 或 `doGet`，完成 Google 授權。
-8. 部署為 Web App，執行身分選「我」。
-9. 用手機打開 Web App URL，貼上 JSON 後建立表單。
-
-## Beginner Installation
-
-Full guide:
-
-- [Traditional Chinese installation guide](docs/install.zh-TW.md)
-- [English installation guide](docs/install.en.md)
-
-Short version:
-
-1. Open Google Apps Script.
-2. Create a new project named GAS FormFlow.
-3. Copy all content from `dist/Code.gs` into Apps Script `Code.gs`.
-4. Create an HTML file named `Index`.
-5. Copy all content from `dist/Index.html` into Apps Script `Index.html`.
-6. Save the project.
-7. Run `setup` or `doGet` once and complete Google authorization.
-8. Deploy as a Web App, executing as Me.
-9. Open the Web App URL on your phone, paste JSON, and create forms.
-
-## 進階部署：clasp
-
-```bash
-git clone https://github.com/ssamexy/gas-formflow.git
-cd gas-formflow
-npm install -g @google/clasp
-clasp login
-clasp create --type standalone --title "GAS FormFlow"
-clasp push
-```
-
-接著打開 Apps Script 專案，部署為 Web App。
-
-若要綁定既有專案：
-
-```bash
-clasp clone <scriptId>
-clasp push
-```
-
-建議讓 `.clasp.json` 使用 `dist` 作為 root：
-
-```json
-{
-  "scriptId": "YOUR_SCRIPT_ID",
-  "rootDir": "dist"
-}
-```
-
-## Repo 結構
-
-```text
-src/       多檔案開發版
-dist/      小白複製版，只需要 Code.gs 與 Index.html
-examples/  範例 JSON
-docs/      schema、prompt、部署教學
-tools/     本地打包與驗證腳本
-```
-
-`src/` 的 HTML、CSS 與前端 JavaScript 會依功能拆分以方便維護；`npm run build:private` 會將所有片段與 QR library 完整內嵌回單一 `dist/Index.html`。初學者仍只需複製 `dist/Code.gs` 與 `dist/Index.html`，不需要理解或逐一建立來源模組檔案。`npm run check` 會阻止任何未內嵌的 `include(...)` 進入 copy/paste 版本。
-
-## v1 功能
-
-- JSON 輸入、範例載入、驗證與接近 Google Forms 填寫畫面的預覽
-- 內建範例以紫色標示來源，並可一鍵複製給其他 AI 當 JSON 格式模板
-- 建立 Google Form
-- 建立 Google Sheet 並設定 Form response destination
-- 建立 `Clean_Data`、`Question_Meta`、`Summary`、`Announcement`、`Generator_Log` 分頁
-- 產生可複製的 LINE / 通訊軟體公告文案
-- 顯示填寫連結、編輯連結、Sheet 連結與建立時間
-- 預留 i18n 結構
-
-## QR code 狀態
-
-QR code 會由 Web App 在瀏覽器內使用內嵌的 Nayuki QR Code generator v1.8.0 產生，可直接掃描並下載為 SVG。表單網址不會傳送給外部 QR API。
-
-## v2 AI API
-
-可選擇使用自己的 Google Gemini 或 Groq API Key：
-
-- Key 使用密碼欄輸入並以獨立按鈕安全儲存；成功後欄位立即清空，前端只知道是否已保存。
-- 依 provider 動態偵測適合表單討論與 JSON 轉換的模型，選定模型後另行儲存。
-- 在瀏覽器內與 AI 多輪討論白話文表單雛型；對話不寫入 `ScriptProperties`，聊天階段不會改動 JSON。
-- 使用者明確按下「我同意目前雛型，轉成 JSON」後，才轉換、驗證並寫入獨立 JSON 編輯區。
-- JSON 編輯區也接受其他 AI 產生的 JSON，並可在右側預覽。
-- 首次使用提供「連接 AI → 討論雛型 → 預覽建立」導引與 starter prompts；Key／模型藏在 AI 設定視窗，確認動作使用應用程式內 dialog。
-- Key 不會回傳前端、寫入 log 或放進 API URL；公開 `agent` 模式停用所有 AI 功能。
-- private 模式提供 `apiRunAiProviderSmoke(providerId)`，可用已儲存的 Key 真實驗證模型列舉、討論與 JSON 生成；回傳資料不包含 Key。
-
-模型出現在清單中不代表一定具有免費額度；free tier、地區限制與 quota 由 Google 決定。完整設定方式：
+設定方式：
 
 - [Gemini API 繁體中文指南](docs/ai-gemini.zh-TW.md)
-- [Gemini API English guide](docs/ai-gemini.en.md)
 - [Groq API 與 ZDR 繁體中文指南](docs/ai-groq.zh-TW.md)
+- [Gemini API English guide](docs/ai-gemini.en.md)
 - [Groq API and ZDR English guide](docs/ai-groq.en.md)
 
-## AI Agent 驗證
+## 開發者
 
-部署成 Web App 後，AI agent 可以用無副作用 endpoint 驗證部署狀態：
-
-```text
-WEB_APP_URL?mode=health
-WEB_APP_URL?mode=agent-test
-```
-
-也可以在本機執行：
-
-```bash
-TEST_WEB_APP_URL="https://script.google.com/macros/s/DEPLOYMENT_ID/exec" npm run smoke:agent
-```
-
-詳細驗證矩陣見 [Agent Validation Guide](docs/agent-validation.md)。
-
-如果 HTTP smoke test 回 Google 登入頁或 403，代表 Google 的 Apps Script deployment access 在程式碼執行前就擋住匿名請求。這時需要用已登入且有權限的瀏覽器 session 測，或到 Apps Script UI 調整 Web App 存取權。
-
-## 部署模式
-
-本 repo 使用同一套程式碼、兩種 manifest：
-
-- `private`：預設模式，給小白使用者與日常自架使用，Web App access 為 `MYSELF`。
-- `agent`：短暫公開給 AI agent 驗證 Web URL，Web App access 為 `ANYONE`，但建立資源的 smoke endpoint 必須帶 token。
-
-常用命令：
-
-```bash
-npm run build:private
-npm run build:agent
-npm run check
-```
-
-驗證完成後必須跑回：
-
-```bash
-npm run build:private
-clasp push -f
-```
-
-同時要下架暫時公開的 agent deployment；deployment ID 只留在本機，不要貼到聊天、issue 或文件。
-
-詳細流程見 [Deployment Modes](docs/deployment-modes.md)。
-
-完整建立流程可用以下有副作用 endpoint 驗證，會在部署者帳號建立一份測試 Form/Sheet：
-
-```text
-WEB_APP_URL?mode=create-smoke&confirm=CREATE_TEST_RESOURCES&token=AGENT_SMOKE_TOKEN
-```
-
-`AGENT_SMOKE_TOKEN` 必須先存入 Apps Script Properties。
-
-建立後可用下列 endpoint 讀回 Sheet 結構：
-
-```text
-WEB_APP_URL?mode=verify-smoke&sheetId=SPREADSHEET_ID&token=AGENT_SMOKE_TOKEN
-```
-
-## v1 不支援
-
-- 檔案上傳題
-- 圖片題
-- 影片題
-- 完整測驗模式、答案、配分
-- 複雜跳題邏輯
-- 表單主題樣式設定
-- 不保證支援超大型問卷
-
-遇到不支援題型時，請先產生基本表單後，到 Google Forms 後台手動微調。
-
-## ChatGPT Prompt
-
-```text
-請根據我的需求，產生符合 GAS FormFlow v1 schema 的 JSON。
-
-規則：
-1. 只輸出 JSON，不要加 markdown code block。
-2. schemaVersion 固定為 "1.0"。
-3. 每題都要有 key、type、title。
-4. 題型只可使用 shortText、paragraph、multipleChoice、checkbox、dropdown、date、time、scale、sectionHeader、pageBreak、grid、checkboxGrid。
-5. multipleChoice、checkbox、dropdown 必須提供 options array。
-6. 若題目需要統計，請加上 analysis。
-7. 不要使用檔案上傳、圖片、影片、測驗、跳題邏輯。
-8. JSON 必須可被 JSON.parse() 解析，不可有註解，不可有 trailing comma。
-9. 使用繁體中文。
-
-我的表單需求如下：
-【貼上需求】
-```
-
-## 本地檢查
+`src/` 是模組化原始碼；`dist/` 是提供一般使用者複製的雙檔版本。
 
 ```bash
 npm run check
 ```
 
-這會重建 `dist/`，並檢查必要檔案、範例 JSON、支援題型與主要 GAS entry points。
+進階部署、clasp、private/agent build 與 smoke test 請見：
+
+- [Deployment Modes](docs/deployment-modes.md)
+- [Agent Validation Guide](docs/agent-validation.md)
+- [Schema v1](docs/schema-v1.md)
+
+## 授權
+
+MIT
