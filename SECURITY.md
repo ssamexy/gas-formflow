@@ -1,5 +1,7 @@
 # GAS FormFlow 安全、資料與權限
 
+**最後更新 / Last updated:** 2026-07-16
+
 ## 資料放在哪裡
 
 自行部署後：
@@ -61,6 +63,63 @@ GAS FormFlow 不要求完整 Google Drive scope，也不會掃描使用者 Drive
 
 ---
 
-## English summary
+# GAS FormFlow Security, Data, and Permissions
 
-Self-hosted deployments keep the Apps Script project, generated Forms, Sheets, and API settings under the user's Google account. The beginner deployment must use **Execute as: Me** and **Who has access: Only myself**. Do not publicly share the FormFlow Web App URL, credentials, deployment IDs, or editable resource links.
+## Where your data is stored
+
+After you deploy your own copy:
+
+- The GAS FormFlow code runs in your own Google Apps Script project.
+- Generated Google Forms and response Sheets are stored in your own Google Drive.
+- Gemini or Groq API Keys are stored in that project's Script Properties.
+- The FormFlow project author has no backend access to your Forms, responses, or API Keys.
+
+## AI data flow
+
+Form content is sent to an AI provider only when you actively use AI discussion or JSON generation:
+
+- Google Gemini processes it under your own Gemini API account and policies.
+- Groq processes it under your own Groq account, model, and data settings.
+- Without an API Key, FormFlow does not send form content to an AI service.
+
+AI conversation history remains in the current browser tab's frontend state and is not written to Script Properties. API Keys are not returned to the frontend, written to logs, or placed in request URLs.
+
+## Google permissions
+
+| OAuth scope | Purpose |
+|---|---|
+| `forms` | Create and configure Google Forms |
+| `spreadsheets` | Create response Sheets, statistics, and announcement tabs |
+| `script.storage` | Store AI API Keys, model selections, and private settings |
+| `script.external_request` | Connect to the Gemini or Groq API selected by the user |
+
+GAS FormFlow does not request the full Google Drive scope and does not scan unrelated files in your Drive.
+
+## Secure deployment baseline
+
+Beginner installations should use:
+
+| Setting | Required value |
+|---|---|
+| Project type | Standalone Apps Script |
+| Execute as | Me |
+| Who has access | Only myself |
+| API Key | Your own Key |
+| Web App URL | Keep private |
+
+Share the generated Google Form response URL with respondents. Do not share the FormFlow Web App URL.
+
+## Revoke access and remove data
+
+When you stop using FormFlow, you can:
+
+1. Archive the Web App deployment under Apps Script's Deploy > Manage deployments.
+2. Delete the Apps Script project to remove its Script Properties and stored API Keys.
+3. Revoke authorization from your Google Account's third-party apps and services connections page.
+4. Keep or delete previously generated Forms and Sheets individually.
+
+Deleting the FormFlow Apps Script project does not automatically delete Forms or Sheets it created earlier.
+
+## Report a security issue
+
+Do not post API Keys, deployment IDs, Script IDs, Form edit links, or Sheets containing personal data in a public issue. Report security issues through a private contact method provided by the GitHub repository owner.
