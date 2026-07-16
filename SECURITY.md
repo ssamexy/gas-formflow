@@ -27,7 +27,6 @@ AI 對話保留在目前瀏覽器分頁的前端狀態，不寫入 Script Proper
 | `spreadsheets` | 建立回應 Sheet、統計與公告分頁 |
 | `script.storage` | 儲存 AI API Key、模型與私人設定 |
 | `script.external_request` | 連線到使用者選擇的 Gemini 或 Groq API |
-| `userinfo.email` | 識別已登入的 Google 帳號；若程式未使用此資訊，後續版本將評估移除 |
 
 GAS FormFlow 不要求完整 Google Drive scope，也不會掃描使用者 Drive 中的其他檔案。
 
