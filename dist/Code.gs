@@ -1361,9 +1361,12 @@ var SheetBuilder = (function () {
     return matches[0];
   }
   function finalizeResponseSheets(spreadsheet, formResult, spec) {
-    var deadline = Date.now() + 10000;
+    // Form destination binding can take longer than 10 seconds under load.
+    // Keep a bounded wait, but avoid reporting a false creation failure.
+    var deadline = Date.now() + 30000;
     var responseSheet = null;
     while (Date.now() < deadline && !responseSheet) {
+      spreadsheet = SpreadsheetApp.openById(spreadsheet.getId());
       responseSheet = findResponseSheetByHeaders(spreadsheet.getSheets(), spec);
       if (!responseSheet) Utilities.sleep(250);
     }
