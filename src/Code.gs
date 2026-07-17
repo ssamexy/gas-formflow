@@ -187,8 +187,9 @@ function createFormFlow_(jsonText) {
 
     var spec = validation.spec;
     var formResult = FormBuilder.create(spec);
-    var sheetResult = SheetBuilder.create(spec, formResult);
+    var sheetResult = SheetBuilder.create(spec);
     formResult.form.setDestination(FormApp.DestinationType.SPREADSHEET, sheetResult.spreadsheet.getId());
+    var derivedSheets = SheetBuilder.finalizeResponseSheets(sheetResult.spreadsheet, formResult, spec);
 
     var values = {
       title: spec.title || '',
@@ -276,7 +277,7 @@ function apiCreateSmokeTest_() {
   result.sideEffects = result.ok
     ? 'created one Google Form and one Google Sheet in the deploying account'
     : 'none confirmed; creation failed before success response';
-  result.expectedSheets = ['Form Responses 1', 'Clean_Data', 'Question_Meta', 'Summary', 'Announcement', 'Generator_Log'];
+  result.expectedSheets = ['response sheet (auto-detected)', 'Clean_Data', 'Question_Meta', 'Form_Info', 'Summary', 'Announcement', 'Generator_Log'];
   return result;
 }
 
@@ -287,11 +288,10 @@ function apiVerifySmokeResources_(sheetId) {
   try {
     var spreadsheet = SpreadsheetApp.openById(sheetId);
     var sheetNames = spreadsheet.getSheets().map(function (sheet) { return sheet.getName(); });
-    var expectedSheets = ['Form Responses 1', 'Clean_Data', 'Question_Meta', 'Summary', 'Announcement', 'Generator_Log'];
+    var smokeSpec = buildSmokeSpec();
+    var responseSheet = SheetBuilder.findResponseSheetByHeaders(spreadsheet.getSheets(), smokeSpec);
+    var expectedSheets = ['Clean_Data', 'Question_Meta', 'Form_Info', 'Summary', 'Announcement', 'Generator_Log'];
     var missingSheets = expectedSheets.filter(function (name) { return sheetNames.indexOf(name) === -1; });
-    var unexpectedResponseSheets = sheetNames.filter(function (name) {
-      return /^Form Responses \d+$/.test(name) && name !== 'Form Responses 1';
-    });
     var cleanData = spreadsheet.getSheetByName('Clean_Data');
     var questionMeta = spreadsheet.getSheetByName('Question_Meta');
     var summary = spreadsheet.getSheetByName('Summary');
@@ -302,14 +302,14 @@ function apiVerifySmokeResources_(sheetId) {
     var summaryRows = summary && summary.getLastRow() > 1 ? summary.getRange(1, 1, Math.min(summary.getLastRow(), 12), summary.getLastColumn()).getDisplayValues() : [];
     var announcementText = announcement ? announcement.getRange(2, 1).getDisplayValue() : '';
     var logRows = log ? Math.max(0, log.getLastRow() - 1) : 0;
-    var requiredCleanHeaders = ['timestamp', 'name', 'area', 'support', 'score', 'available_date', 'availability_grid'];
+    var requiredCleanHeaders = ['timestamp', 'name', 'area', 'support', 'score', 'available_date', 'availability_grid__row_1', 'availability_grid__row_2'];
     var missingCleanHeaders = requiredCleanHeaders.filter(function (name) { return cleanHeaders.indexOf(name) === -1; });
     return {
-      ok: missingSheets.length === 0 && unexpectedResponseSheets.length === 0 && missingCleanHeaders.length === 0 && !!announcementText && logRows > 0,
+      ok: missingSheets.length === 0 && !!responseSheet && missingCleanHeaders.length === 0 && !!announcementText && logRows > 0,
       spreadsheetName: spreadsheet.getName(),
       sheetNames: sheetNames,
       missingSheets: missingSheets,
-      unexpectedResponseSheets: unexpectedResponseSheets,
+      responseSheetName: responseSheet ? responseSheet.getName() : '',
       cleanHeaders: cleanHeaders,
       missingCleanHeaders: missingCleanHeaders,
       questionMetaHeaders: questionMetaHeaders,

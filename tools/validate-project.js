@@ -169,6 +169,7 @@ verifyInlineScripts(distHtml);
 verifyFrontendStartup(distHtml);
 verifyQrEncoder();
 verifyFormDescriptions();
+verifyResponseSheetLayout();
 verifyAiServices();
 verifyGroqServices();
 
@@ -432,6 +433,26 @@ function verifyFormDescriptions() {
   const scalePreview = FormBuilder.preview(scaleSpec);
   FormBuilder.create(scaleSpec);
   if (scalePreview.items[0].lowerBound !== 0 || itemState.bounds[0] !== 0) fail('scale lower bound zero must be preserved in preview and form creation');
+}
+
+function verifyResponseSheetLayout() {
+  const source = fs.readFileSync(path.join(root, 'src/SheetBuilder.gs'), 'utf8');
+  const SheetBuilder = new Function(`${source}; return SheetBuilder;`)();
+  const spec = {
+    items: [
+      { key: 'name', type: 'shortText', title: 'Name' },
+      { key: 'availability', type: 'grid', title: 'Availability', rows: ['Morning', 'Afternoon'], columns: ['Yes', 'No'] },
+      { key: 'email', type: 'shortText', title: 'Email' },
+      { key: 'slots', type: 'checkboxGrid', title: 'Slots', rows: ['Friday', 'Saturday'], columns: ['AM', 'PM'] }
+    ]
+  };
+  const headers = ['Timestamp', 'Name', 'Availability [Morning]', 'Availability [Afternoon]', 'Email', 'Slots [Friday]', 'Slots [Saturday]'];
+  const layout = SheetBuilder.buildResponseLayout(headers, spec);
+  const expectedKeys = ['timestamp', 'name', 'availability__row_1', 'availability__row_2', 'email', 'slots__row_1', 'slots__row_2'];
+  if (layout.cleanDataColumns.join('|') !== expectedKeys.join('|')) fail('response layout must expand grid rows and preserve following field alignment');
+  if (layout.sourceByCleanKey.email !== 'E') fail('response layout must derive columns from response headers, not item positions');
+  if (layout.responseHeaderByCleanKey.slots__row_2 !== 'Slots [Saturday]') fail('response layout must preserve checkbox-grid row headers');
+  if (SheetBuilder.findResponseSheetByHeaders([{ getName: () => 'Dashboard', getLastColumn: () => 1, getRange: () => ({ getDisplayValues: () => [['Overview']] }) }, { getName: () => '回覆資料', getLastColumn: () => headers.length, getRange: () => ({ getDisplayValues: () => [headers] }) }], spec).getName() !== '回覆資料') fail('response sheet discovery must not assume an English tab name');
 }
 
 function verifyAiServices() {

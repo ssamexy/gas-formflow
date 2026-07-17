@@ -194,8 +194,9 @@ function createFormFlow_(jsonText) {
 
     var spec = validation.spec;
     var formResult = FormBuilder.create(spec);
-    var sheetResult = SheetBuilder.create(spec, formResult);
+    var sheetResult = SheetBuilder.create(spec);
     formResult.form.setDestination(FormApp.DestinationType.SPREADSHEET, sheetResult.spreadsheet.getId());
+    var derivedSheets = SheetBuilder.finalizeResponseSheets(sheetResult.spreadsheet, formResult, spec);
 
     var values = {
       title: spec.title || '',
@@ -283,7 +284,7 @@ function apiCreateSmokeTest_() {
   result.sideEffects = result.ok
     ? 'created one Google Form and one Google Sheet in the deploying account'
     : 'none confirmed; creation failed before success response';
-  result.expectedSheets = ['Form Responses 1', 'Clean_Data', 'Question_Meta', 'Summary', 'Announcement', 'Generator_Log'];
+  result.expectedSheets = ['response sheet (auto-detected)', 'Clean_Data', 'Question_Meta', 'Form_Info', 'Summary', 'Announcement', 'Generator_Log'];
   return result;
 }
 
@@ -294,11 +295,10 @@ function apiVerifySmokeResources_(sheetId) {
   try {
     var spreadsheet = SpreadsheetApp.openById(sheetId);
     var sheetNames = spreadsheet.getSheets().map(function (sheet) { return sheet.getName(); });
-    var expectedSheets = ['Form Responses 1', 'Clean_Data', 'Question_Meta', 'Summary', 'Announcement', 'Generator_Log'];
+    var smokeSpec = buildSmokeSpec();
+    var responseSheet = SheetBuilder.findResponseSheetByHeaders(spreadsheet.getSheets(), smokeSpec);
+    var expectedSheets = ['Clean_Data', 'Question_Meta', 'Form_Info', 'Summary', 'Announcement', 'Generator_Log'];
     var missingSheets = expectedSheets.filter(function (name) { return sheetNames.indexOf(name) === -1; });
-    var unexpectedResponseSheets = sheetNames.filter(function (name) {
-      return /^Form Responses \d+$/.test(name) && name !== 'Form Responses 1';
-    });
     var cleanData = spreadsheet.getSheetByName('Clean_Data');
     var questionMeta = spreadsheet.getSheetByName('Question_Meta');
     var summary = spreadsheet.getSheetByName('Summary');
@@ -309,14 +309,14 @@ function apiVerifySmokeResources_(sheetId) {
     var summaryRows = summary && summary.getLastRow() > 1 ? summary.getRange(1, 1, Math.min(summary.getLastRow(), 12), summary.getLastColumn()).getDisplayValues() : [];
     var announcementText = announcement ? announcement.getRange(2, 1).getDisplayValue() : '';
     var logRows = log ? Math.max(0, log.getLastRow() - 1) : 0;
-    var requiredCleanHeaders = ['timestamp', 'name', 'area', 'support', 'score', 'available_date', 'availability_grid'];
+    var requiredCleanHeaders = ['timestamp', 'name', 'area', 'support', 'score', 'available_date', 'availability_grid__row_1', 'availability_grid__row_2'];
     var missingCleanHeaders = requiredCleanHeaders.filter(function (name) { return cleanHeaders.indexOf(name) === -1; });
     return {
-      ok: missingSheets.length === 0 && unexpectedResponseSheets.length === 0 && missingCleanHeaders.length === 0 && !!announcementText && logRows > 0,
+      ok: missingSheets.length === 0 && !!responseSheet && missingCleanHeaders.length === 0 && !!announcementText && logRows > 0,
       spreadsheetName: spreadsheet.getName(),
       sheetNames: sheetNames,
       missingSheets: missingSheets,
-      unexpectedResponseSheets: unexpectedResponseSheets,
+      responseSheetName: responseSheet ? responseSheet.getName() : '',
       cleanHeaders: cleanHeaders,
       missingCleanHeaders: missingCleanHeaders,
       questionMetaHeaders: questionMetaHeaders,
@@ -448,6 +448,7 @@ var SchemaValidator = (function () {
     }
 
     var keys = {};
+    var dataTitles = {};
     spec.items.forEach(function (item, index) {
       var label = '第 ' + (index + 1) + ' 題';
       if (!item || typeof item !== 'object') {
@@ -468,6 +469,8 @@ var SchemaValidator = (function () {
       }
       if (!hasText(item.title) && item.type !== 'pageBreak') errors.push(label + ' 缺少 title。');
       if (hasText(item.title) && item.title.length > LIMITS.maxTextChars) errors.push(label + ' 的 title 過長。');
+      if (hasText(item.title) && isDataItem_(item) && dataTitles[item.title]) errors.push(label + ' has a duplicate title and cannot be safely mapped to a response column.');
+      if (hasText(item.title) && isDataItem_(item)) dataTitles[item.title] = true;
       if (item.helpText && String(item.helpText).length > LIMITS.maxTextChars) errors.push(label + ' 的 helpText 過長。');
       if (item.description && String(item.description).length > LIMITS.maxTextChars) errors.push(label + ' 的 description 過長。');
       if (OPTION_TYPES[item.type] && !hasStringArray(item.options)) {
@@ -503,6 +506,10 @@ var SchemaValidator = (function () {
     });
   }
 
+  function isDataItem_(item) {
+    return item && ['sectionHeader', 'pageBreak'].indexOf(item.type) === -1;
+  }
+
   function fail(errors, spec) {
     return { ok: false, errors: errors, spec: spec || null };
   }
@@ -530,7 +537,8 @@ var AiPrompt = (function () {
     return [
       'You are a collaborative Google Form designer speaking Traditional Chinese.',
       'Discuss the form with the user over multiple turns. Ask focused questions when requirements are unclear.',
-      'Keep a visible plain-language draft covering purpose, audience, form title, description, sections, questions, question types, required status, options, and analysis needs.',
+      'Keep a visible plain-language draft covering purpose, audience, form title, description, sections, questions, question types, required status, options, analysis needs, and the response unit (one person, household, team, order, or other explicit unit).',
+      'Before approval of a draft with statistics, explicitly resolve how headcounts, capacity, supplies, grouping, and any "or more" option should be interpreted; prefer structured options or an exact numeric field when totals must be exact.',
       'Every response must end with the latest consolidated draft, clearly labeled 「目前表單雛型」, even when you still have follow-up questions.',
       'Do not output JSON, code fences, schema field names, or claim that the form has been created.',
       'The user controls when the draft is approved and converted to JSON.'
@@ -1277,7 +1285,7 @@ var FormBuilder = (function () {
 
 // ===== src/SheetBuilder.gs =====
 var SheetBuilder = (function () {
-  var SHEETS = ['Form Responses 1', 'Clean_Data', 'Question_Meta', 'Summary', 'Announcement', 'Generator_Log'];
+  var SHEETS = ['Clean_Data', 'Question_Meta', 'Form_Info', 'Summary', 'Announcement', 'Generator_Log'];
 
   function preview(spec) {
     var statItems = getStatItems(spec);
@@ -1292,40 +1300,109 @@ var SheetBuilder = (function () {
     };
   }
 
-  function create(spec, formResult) {
+  function create(spec) {
     var spreadsheet = SpreadsheetApp.create(spec.sheetName || (spec.title + ' Responses'));
     ensureSheets(spreadsheet);
-    writeCleanData(spreadsheet, spec);
-    writeQuestionMeta(spreadsheet, spec);
-    SummaryBuilder.writeSummary(spreadsheet, spec);
-    writeAnnouncement(spreadsheet, '');
-    writeLogHeader(spreadsheet);
-    return {
-      spreadsheet: spreadsheet,
-      sheetUrl: spreadsheet.getUrl()
-    };
+    return { spreadsheet: spreadsheet, sheetUrl: spreadsheet.getUrl() };
   }
 
   function ensureSheets(spreadsheet) {
     var first = spreadsheet.getSheets()[0];
     first.setName('Clean_Data');
-    SHEETS.filter(function (name) { return name !== 'Form Responses 1' && name !== 'Clean_Data'; }).forEach(function (name) {
-      var existing = spreadsheet.getSheetByName(name);
-      if (!existing) spreadsheet.insertSheet(name);
+    SHEETS.filter(function (name) { return name !== 'Clean_Data'; }).forEach(function (name) {
+      if (!spreadsheet.getSheetByName(name)) spreadsheet.insertSheet(name);
     });
   }
 
-  function writeCleanData(spreadsheet, spec) {
+
+  function buildResponseLayout(headers, spec) {
+    if (!Array.isArray(headers) || headers.length < 2) throw new Error('Response sheet headers are not ready.');
+    var layout = { cleanDataColumns: ['timestamp'], sourceByCleanKey: { timestamp: columnLetter(1) }, responseHeaderByCleanKey: { timestamp: headers[0] } };
+    spec.items.filter(isDataItem).forEach(function (item) {
+      if (item.type === 'grid' || item.type === 'checkboxGrid') {
+        (item.rows || []).forEach(function (row, rowIndex) {
+          var cleanKey = item.key + '__row_' + (rowIndex + 1);
+          addLayoutColumn_(layout, cleanKey, findGridHeader_(headers, item.title, row));
+        });
+        return;
+      }
+      addLayoutColumn_(layout, item.key, findExactHeader_(headers, item.title));
+    });
+    return layout;
+  }
+
+  function findResponseSheetByHeaders(sheets, spec) {
+    for (var index = 0; index < sheets.length; index += 1) {
+      var sheet = sheets[index];
+      if (!sheet || sheet.getLastColumn() < 2) continue;
+      try {
+        buildResponseLayout(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0], spec);
+        return sheet;
+      } catch (error) {}
+    }
+    return null;
+  }
+
+  function addLayoutColumn_(layout, cleanKey, match) {
+    layout.cleanDataColumns.push(cleanKey);
+    layout.sourceByCleanKey[cleanKey] = columnLetter(match.index + 1);
+    layout.responseHeaderByCleanKey[cleanKey] = match.header;
+  }
+
+  function findExactHeader_(headers, title) {
+    var matches = headers.map(function (header, index) { return { header: header, index: index }; }).filter(function (candidate) { return candidate.header === title; });
+    if (matches.length !== 1) throw new Error('Expected exactly one response column for "' + title + '".');
+    return matches[0];
+  }
+
+  function findGridHeader_(headers, title, row) {
+    var matches = headers.map(function (header, index) { return { header: header, index: index }; }).filter(function (candidate) { return candidate.header === title + ' [' + row + ']' || candidate.header === title + ' - ' + row || candidate.header === title + ': ' + row; });
+    if (matches.length !== 1) throw new Error('Expected one response column for grid row "' + title + '" / "' + row + '".');
+    return matches[0];
+  }
+  function finalizeResponseSheets(spreadsheet, formResult, spec) {
+    var deadline = Date.now() + 10000;
+    var responseSheet = null;
+    while (Date.now() < deadline && !responseSheet) {
+      responseSheet = findResponseSheetByHeaders(spreadsheet.getSheets(), spec);
+      if (!responseSheet) Utilities.sleep(250);
+    }
+    if (!responseSheet) throw new Error('Google Form response sheet was not created with the expected headers.');
+    var headers = responseSheet.getRange(1, 1, 1, responseSheet.getLastColumn()).getDisplayValues()[0];
+    var layout = buildResponseLayout(headers, spec);
+    layout.responseSheetName = responseSheet.getName();
+    var analysis = spec.analysis || {};
+    var generateSummary = analysis.enabled !== false && analysis.generateSummary !== false;
+    var generateCleanData = analysis.enabled !== false && (analysis.generateCleanData !== false || generateSummary);
+    if (generateCleanData) writeCleanData(spreadsheet, layout);
+    writeQuestionMeta(spreadsheet, spec);
+    writeFormInfo(spreadsheet, formResult, spec, responseSheet);
+    if (generateSummary) SummaryBuilder.writeSummaryForLayout(spreadsheet, spec, layout);
+    writeAnnouncement(spreadsheet, '');
+    writeLogHeader(spreadsheet);
+    return { responseSheet: responseSheet, layout: layout };
+  }
+
+  function writeCleanData(spreadsheet, layout) {
     var sheet = spreadsheet.getSheetByName('Clean_Data');
     sheet.clear();
-    var columns = preview(spec).cleanDataColumns;
-    sheet.getRange(1, 1, 1, columns.length).setValues([columns]);
-    var formulas = columns.map(function (_, index) {
-      var sourceColumn = columnLetter(index + 1);
-      return '=ARRAYFORMULA(IF(\'Form Responses 1\'!' + sourceColumn + '2:' + sourceColumn + '="",,\'Form Responses 1\'!' + sourceColumn + '2:' + sourceColumn + '))';
+    sheet.getRange(1, 1, 1, layout.cleanDataColumns.length).setValues([layout.cleanDataColumns]);
+    var quotedResponseSheet = quoteSheetName_(layout.responseSheetName);
+    var formulas = layout.cleanDataColumns.map(function (cleanKey) {
+      var sourceColumn = layout.sourceByCleanKey[cleanKey];
+      return '=ARRAYFORMULA(IF(' + quotedResponseSheet + '!' + sourceColumn + '2:' + sourceColumn + '="",,' + quotedResponseSheet + '!' + sourceColumn + '2:' + sourceColumn + '))';
     });
     sheet.getRange(2, 1, 1, formulas.length).setFormulas([formulas]);
     sheet.setFrozenRows(1);
+  }
+
+  function writeFormInfo(spreadsheet, formResult, spec, responseSheet) {
+    var sheet = spreadsheet.getSheetByName('Form_Info');
+    sheet.clear();
+    var rows = [['field', 'value'], ['title', safeCellText(spec.title)], ['description', safeCellText(spec.description || '')], ['deadline', safeCellText(spec.deadlineText || '')], ['notice', safeCellText(spec.notice || '')], ['responseUnit', safeCellText(spec.analysis && spec.analysis.responseUnit || '')], ['publishedUrl', formResult.publishedUrl], ['editUrl', formResult.editUrl], ['sheetUrl', spreadsheet.getUrl()], ['responseSheet', safeCellText(responseSheet.getName())]];
+    sheet.getRange(1, 1, rows.length, 2).setValues(rows);
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(2, 700);
   }
 
   function writeQuestionMeta(spreadsheet, spec) {
@@ -1409,6 +1486,10 @@ var SheetBuilder = (function () {
     return /^[=+\-@]/.test(text) ? "'" + text : text;
   }
 
+  function quoteSheetName_(sheetName) {
+    return "'" + String(sheetName).replace(/'/g, "''") + "'";
+  }
+
   function columnLetter(columnNumber) {
     var letter = '';
     while (columnNumber > 0) {
@@ -1422,11 +1503,14 @@ var SheetBuilder = (function () {
   return {
     preview: preview,
     create: create,
+    finalizeResponseSheets: finalizeResponseSheets,
     writeAnnouncement: writeAnnouncement,
     writeLog: writeLog,
     renderTemplate: renderTemplate,
     inferSummaryType: inferSummaryType,
     isDataItem: isDataItem,
+    buildResponseLayout: buildResponseLayout,
+    findResponseSheetByHeaders: findResponseSheetByHeaders,
     columnLetter: columnLetter,
     safeCellText: safeCellText
   };
@@ -1435,34 +1519,9 @@ var SheetBuilder = (function () {
 
 // ===== src/SummaryBuilder.gs =====
 var SummaryBuilder = (function () {
-  function writeSummary(spreadsheet, spec) {
-    var sheet = spreadsheet.getSheetByName('Summary');
-    sheet.clear();
-    var rows = [
-      ['section', 'field', 'metric', 'value'],
-      ['overview', 'responses', 'total', '=MAX(0,COUNTA(\'Form Responses 1\'!A:A)-1)']
-    ];
-    var dataColumn = 2;
-    spec.items.filter(SheetBuilder.isDataItem).forEach(function (item) {
-      var summaryType = SheetBuilder.inferSummaryType(item);
-      if (summaryType) rows = rows.concat(buildRows(item, dataColumn, summaryType));
-      dataColumn += 1;
-    });
-    if (spec.analysis && spec.analysis.primaryKey) {
-      var primaryIndex = findDataIndex(spec, spec.analysis.primaryKey);
-      if (primaryIndex !== -1) {
-        var primaryColumn = SheetBuilder.columnLetter(primaryIndex + 2);
-        rows.push(['quality', SheetBuilder.safeCellText(spec.analysis.primaryKey), 'possibleDuplicates', '=IF(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',"?*")=0,0,MAX(COUNTIF(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',FILTER(Clean_Data!' + primaryColumn + '2:' + primaryColumn + ',Clean_Data!' + primaryColumn + '2:' + primaryColumn + '<>""))))']);
-      }
-    }
-    spec.items.filter(SheetBuilder.isDataItem).forEach(function (item, index) {
-      if (!item.required) return;
-      var column = SheetBuilder.columnLetter(index + 2);
-      rows.push(['quality', SheetBuilder.safeCellText(item.key), 'missingCount', '=MAX(0,$D$2-COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*"))']);
-    });
-    sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
-    sheet.setFrozenRows(1);
-    sheet.autoResizeColumns(1, 4);
+  function writeSummary(spreadsheet, spec, layout) {
+    if (!layout) throw new Error('Summary requires a response-sheet layout.');
+    return writeSummaryForLayout(spreadsheet, spec, layout);
   }
 
   function buildRows(item, dataColumn, summaryType) {
@@ -1514,8 +1573,64 @@ var SummaryBuilder = (function () {
     return String(value || '').replace(/"/g, '""');
   }
 
+
+  function writeSummaryForLayout(spreadsheet, spec, layout) {
+    var sheet = spreadsheet.getSheetByName('Summary');
+    sheet.clear();
+    var analysis = spec.analysis || {};
+    if (analysis.enabled === false || analysis.generateSummary === false) {
+      sheet.getRange(1, 1, 2, 4).setValues([['section', 'field', 'metric', 'value'], ['overview', 'analysis', 'status', 'disabled by spec']]);
+      return;
+    }
+    var rows = [['section', 'field', 'metric', 'value'], ['overview', 'responses', 'total', '=MAX(0,COUNTA(Clean_Data!A2:A))']];
+    var selected = Array.isArray(analysis.summaryFields) ? analysis.summaryFields : [];
+    spec.items.filter(SheetBuilder.isDataItem).forEach(function (item) {
+      if (selected.length && selected.indexOf(item.key) === -1) return;
+      getCleanKeys_(item).forEach(function (cleanKey) {
+        var column = SheetBuilder.columnLetter(layout.cleanDataColumns.indexOf(cleanKey) + 1);
+        rows = rows.concat(buildLayoutRows_(item, cleanKey, column));
+      });
+    });
+    spec.items.filter(SheetBuilder.isDataItem).forEach(function (item) {
+      if (!item.required) return;
+      getCleanKeys_(item).forEach(function (cleanKey) {
+        var column = SheetBuilder.columnLetter(layout.cleanDataColumns.indexOf(cleanKey) + 1);
+        rows.push(['quality', SheetBuilder.safeCellText(cleanKey), 'missingCount', '=MAX(0,$D$2-COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*"))']);
+      });
+    });
+    sheet.getRange(1, 1, rows.length, 4).setValues(rows);
+    sheet.setFrozenRows(1);
+    sheet.autoResizeColumns(1, 4);
+  }
+
+  function getCleanKeys_(item) {
+    if (item.type === 'grid' || item.type === 'checkboxGrid') {
+      return (item.rows || []).map(function (_, index) { return item.key + '__row_' + (index + 1); });
+    }
+    return [item.key];
+  }
+
+  function buildLayoutRows_(item, cleanKey, column) {
+    var label = SheetBuilder.safeCellText(cleanKey);
+    if (['multipleChoice', 'dropdown', 'grid'].indexOf(item.type) !== -1) {
+      return (item.options || item.columns || []).map(function (option) {
+        return ['field', label, SheetBuilder.safeCellText(option), '=COUNTIF(Clean_Data!' + column + ':' + column + ',"' + escapeCountifText_(option) + '")'];
+      });
+    }
+    if (item.type === 'checkbox' || item.type === 'checkboxGrid') {
+      return (item.options || item.columns || []).map(function (option) {
+        return ['field', label, SheetBuilder.safeCellText(option), '=SUM(ARRAYFORMULA(N(REGEXMATCH(Clean_Data!' + column + '2:' + column + ',"(^|, )' + escapeRegexText_(option) + '(, |$)"))))'];
+      });
+    }
+    if (item.type === 'scale') return [['field', label, 'average', '=IFERROR(AVERAGE(Clean_Data!' + column + '2:' + column + '),"")'], ['field', label, 'responses', '=COUNT(Clean_Data!' + column + '2:' + column + ')']];
+    return [['field', label, 'filledCount', '=COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")'], ['field', label, 'uniqueValues', '=IF(COUNTIF(Clean_Data!' + column + '2:' + column + ',"?*")=0,0,COUNTUNIQUE(FILTER(Clean_Data!' + column + '2:' + column + ',Clean_Data!' + column + '2:' + column + '<>"")))']];
+  }
+
+  function escapeCountifText_(value) { return String(value || '').replace(/~/g, '~~').replace(/\*/g, '~*').replace(/\?/g, '~?').replace(/"/g, '""'); }
+  function escapeRegexText_(value) { return String(value || '').replace(/[.*+?^$()|[\]{}\\]/g, '\\$&').replace(/"/g, '""'); }
   return {
-    writeSummary: writeSummary
+    writeSummary: writeSummary,
+    writeSummaryForLayout: writeSummaryForLayout
   };
 })();
 

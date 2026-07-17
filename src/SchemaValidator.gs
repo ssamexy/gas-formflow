@@ -65,6 +65,7 @@ var SchemaValidator = (function () {
     }
 
     var keys = {};
+    var dataTitles = {};
     spec.items.forEach(function (item, index) {
       var label = '第 ' + (index + 1) + ' 題';
       if (!item || typeof item !== 'object') {
@@ -85,6 +86,8 @@ var SchemaValidator = (function () {
       }
       if (!hasText(item.title) && item.type !== 'pageBreak') errors.push(label + ' 缺少 title。');
       if (hasText(item.title) && item.title.length > LIMITS.maxTextChars) errors.push(label + ' 的 title 過長。');
+      if (hasText(item.title) && isDataItem_(item) && dataTitles[item.title]) errors.push(label + ' has a duplicate title and cannot be safely mapped to a response column.');
+      if (hasText(item.title) && isDataItem_(item)) dataTitles[item.title] = true;
       if (item.helpText && String(item.helpText).length > LIMITS.maxTextChars) errors.push(label + ' 的 helpText 過長。');
       if (item.description && String(item.description).length > LIMITS.maxTextChars) errors.push(label + ' 的 description 過長。');
       if (OPTION_TYPES[item.type] && !hasStringArray(item.options)) {
@@ -118,6 +121,10 @@ var SchemaValidator = (function () {
     return Array.isArray(value) && value.length > 0 && value.every(function (item) {
       return typeof item === 'string' && item.trim() !== '';
     });
+  }
+
+  function isDataItem_(item) {
+    return item && ['sectionHeader', 'pageBreak'].indexOf(item.type) === -1;
   }
 
   function fail(errors, spec) {
