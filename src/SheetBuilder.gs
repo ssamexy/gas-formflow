@@ -84,7 +84,20 @@ var SheetBuilder = (function () {
       responseSheet = findResponseSheetByHeaders(spreadsheet.getSheets(), spec);
       if (!responseSheet) Utilities.sleep(250);
     }
-    if (!responseSheet) throw new Error('Google Form response sheet was not created with the expected headers.');
+    if (!responseSheet) {
+      var observedSheets = spreadsheet.getSheets().map(function (sheet) {
+        var lastColumn = sheet.getLastColumn();
+        return {
+          name: sheet.getName(),
+          headers: lastColumn > 0 ? sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0] : []
+        };
+      });
+      throw new Error(
+        'Google Form response sheet was not created with the expected headers. ' +
+        'Form link state: ' + (spreadsheet.getFormUrl() ? 'linked' : 'not linked') + '. ' +
+        'Observed sheets: ' + JSON.stringify(observedSheets)
+      );
+    }
     var headers = responseSheet.getRange(1, 1, 1, responseSheet.getLastColumn()).getDisplayValues()[0];
     var layout = buildResponseLayout(headers, spec);
     layout.responseSheetName = responseSheet.getName();

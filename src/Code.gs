@@ -189,6 +189,7 @@ function createFormFlow_(jsonText) {
     var formResult = FormBuilder.create(spec);
     var sheetResult = SheetBuilder.create(spec);
     formResult.form.setDestination(FormApp.DestinationType.SPREADSHEET, sheetResult.spreadsheet.getId());
+    SpreadsheetApp.flush();
     var derivedSheets = SheetBuilder.finalizeResponseSheets(sheetResult.spreadsheet, formResult, spec);
 
     var values = {
@@ -221,10 +222,18 @@ function createFormFlow_(jsonText) {
       qrCode: QrCodeBuilder.buildClientQrPayload(formResult.publishedUrl)
     };
   } catch (error) {
-    return {
+    var failure = {
       ok: false,
       errors: [SchemaValidator.toUserMessage(error)]
     };
+    if (formResult && sheetResult) {
+      failure.partialResources = {
+        publishedUrl: formResult.publishedUrl,
+        editUrl: formResult.editUrl,
+        sheetUrl: sheetResult.sheetUrl
+      };
+    }
+    return failure;
   }
 }
 
